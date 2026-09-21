@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Activity, Smartphone, FileText, LogIn, AlertCircle } from "lucide-react";
+import { Activity, Smartphone, FileText, LogIn, AlertCircle, Loader2 } from "lucide-react";
+import { loginApi } from "../services/authService";
 
 function Login({ setEstConnecte }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [selectedRole, setSelectedRole] = useState("medecin");
   const [erreur, setErreur] = useState(""); // État pour afficher les erreurs
+  const [chargement, setChargement] = useState(false); // État pour désactiver le bouton pendant la requête
+  
   const navigate = useNavigate();
 
   const roles = [
@@ -30,7 +33,7 @@ function Login({ setEstConnecte }) {
     },
   ];
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setErreur(""); // Réinitialiser l'erreur
 
@@ -39,22 +42,21 @@ function Login({ setEstConnecte }) {
       setErreur("Veuillez saisir votre identifiant et votre mot de passe.");
       return;
     }
+    setChargement(true); // Désactiver le bouton pendant la requête
 
-    // 2. Base de données de test de simulation
-    const comptesTest = {
-      regulateur: "regulateur@example.com",
-      brancardier: "brancardier@example.com",
-      medecin: "medecin@example.com",
-    };
+  
 
-    // 3. Vérification : L'email et le mot de passe doivent correspondre au profil choisi
-    const emailAttendu = comptesTest[selectedRole];
+    try {
+      // Tâche 3.1 & 3.2 : Appel de l'API et stockage automatique du JWT
+      await loginApi(email, password);
 
-    if (email === emailAttendu && password === "password") {
       setEstConnecte(true);
       navigate(`/${selectedRole}`);
-    } else {
-      setErreur(`Identifiants incorrects pour le profil ${selectedRole}.`);
+    } catch (err) {
+      // Tâche 3.3 : Affichage dynamique de l'erreur renvoyée par le service
+      setErreur(err.message);
+    } finally {
+      setChargement(false);
     }
   }
 
@@ -108,7 +110,7 @@ function Login({ setEstConnecte }) {
                     <span className="text-[10px] text-slate-500 mt-1 leading-tight">{role.subtitle}</span>
                   </button>
                 );
-              })}
+              })} 
             </div>
           </div>
 
@@ -119,7 +121,7 @@ function Login({ setEstConnecte }) {
             </label>
             <input
               type="email"
-              placeholder={`${selectedRole}@example.com`}
+              placeholder="abdoudiallo@ch-hopital.fr"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all"
@@ -140,13 +142,22 @@ function Login({ setEstConnecte }) {
             />
           </div>
 
-          {/* Bouton de Soumission */}
+          {/* Bouton de Soumission avec état de chargement*/}
           <button
             type="submit"
-            className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-colors"
-          >
-            <LogIn className="w-4 h-4" />
-            <span>Connexion sécurisée</span>
+            disabled={chargement} // Désactive le bouton pendant la requête
+            className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer disabled:cursor-not-allowed"          >
+            {chargement ? (   
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Connexion en cours...</span>
+              </>
+            ) : (
+              <>
+                <LogIn className="w-4 h-4" />
+                <span>Connexion sécurisée</span>
+              </>
+            )}
           </button>
         </form>
 
