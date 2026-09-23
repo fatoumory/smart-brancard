@@ -30,7 +30,7 @@ class Mission(Base):
     niveau_urgence = Column(String, nullable=False)
 
     # Matériel requis pour le transport
-    # Valeurs possibles : "brancard" / "fauteuil_roulant" / "incubateur" / "oxygene"
+    # Valeurs possibles : "lit_medicalise" / "fauteuil_roulant" / "support_oxygene"
     materiel_requis = Column(String, nullable=True)
 
     # Statut de la mission: évolue tout au long du cycle de vie (SS2 → SS6)

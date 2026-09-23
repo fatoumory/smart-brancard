@@ -16,4 +16,8 @@ class Patient(Base):
     nom_anonymise = Column(String, nullable=False)
 
     # Code unique du bracelet QR, sert à identifier le patient
-    # lors des scans de validation 
+    # lors des scans de validation (identitovigilance, section 5.5)
+    code_bracelet_qr = Column(String, unique=True, nullable=False, index=True)
+
+    # Date d'enregistrement du patient: horodatage automatique
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

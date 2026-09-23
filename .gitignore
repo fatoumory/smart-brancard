@@ -28,5 +28,6 @@ yarn-error.log*
 .vscode/
 .idea/
 .DS_Store
-Thumbs.dbbackend/venv/
+Thumbs.db
+backend/venv/
 backend/.env
