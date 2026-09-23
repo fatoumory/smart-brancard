@@ -31,7 +31,16 @@ app.add_middleware(
 #  Création des tables en base 
 # Crée automatiquement toutes les tables définies dans les modèles
 # si elles n'existent pas encore dans PostgreSQL
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+except UnicodeDecodeError as e:
+    # Sous Windows, psycopg2 plante en décodant le message d'erreur (en français)
+    # de PostgreSQL: on le décode correctement pour afficher la vraie cause
+    raise RuntimeError(
+        "Connexion à PostgreSQL impossible : "
+        + e.object.decode("cp1252", errors="replace").strip()
+        + "\n-> Vérifier DATABASE_URL dans backend/.env et que la base est démarrée (docker compose up -d)"
+    ) from None
 
 #  Enregistrement des routes 
 app.include_router(auth_router)          # /auth/...
