@@ -1,15 +1,23 @@
 # database.py
 
+import os
+
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
+
+# Charge les variables du fichier .env (sans écraser celles déjà définies)
+load_dotenv()
 
 # URL de connexion à PostgreSQL
 # Format : postgresql://utilisateur:motdepasse@hote:port/nom_base
-DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/smart_brancard"
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL manquante : copier .env.example vers .env et la renseigner")
 
 # Le moteur: c'est lui qui établit la connexion réelle avec PostgreSQL
-engine = create_engine(DATABASE_URL)
+# pool_pre_ping=True : vérifie qu'une connexion est encore vivante avant de l'utiliser
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 # La fabrique de sessions: chaque session = une "conversation" avec la base
 # autocommit=False : on valide manuellement les changements (plus sécurisé)
@@ -17,11 +25,9 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # La classe de base dont hériteront tous nos modèles (Utilisateur, Mission, Patient)
-# SQLAlchemy s'en sert pour créer les tables automatiquement
 Base = declarative_base()
 
 # Dépendance FastAPI: ouvre une session pour chaque requête et la ferme après
-# Le "yield" permet à FastAPI d'injecter la session dans les routes via Depends(get_db)
 def get_db():
     db = SessionLocal()
     try:
