@@ -36,7 +36,11 @@ export async function loginApi(email, password) {
     // Tâche 3.2 : Extraction et sauvegarde du JWT dans le localStorage
     if (data.access_token) {
       localStorage.setItem("token", data.access_token);
-    } else {
+    } 
+      if (data.role) {
+        localStorage.setItem("role", data.role);
+      }
+    else {
       throw new Error("Jeton d'accès manquant dans la réponse du serveur.");
     }
 
@@ -55,4 +59,11 @@ export async function loginApi(email, password) {
  */
 export function logoutApi() {
   localStorage.removeItem("token");
+}
+
+/**
+ * Récupère le jeton JWT stocké
+ */
+export function getToken() {
+  return localStorage.getItem("token");
 }
