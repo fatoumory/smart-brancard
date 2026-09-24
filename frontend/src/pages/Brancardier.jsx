@@ -1,6 +1,9 @@
+import BoutonDeconnexion from "../components/BoutonDeconnexion";
+
 function Brancardier() {
     return (
         <div>
+            <BoutonDeconnexion />
             <h2>Smart Brancard</h2>
             <h3>Cardio-Connect . Systeme de brancardage intelligent</h3>
 
