@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Activity, Smartphone, FileText, LogIn, AlertCircle, Loader2 } from "lucide-react";
-import { loginApi } from "../services/authService";
+import { loginApi, logoutApi } from "../services/authService";
 
-function Login({ setEstConnecte }) {
+function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [selectedRole, setSelectedRole] = useState("medecin");
@@ -48,10 +48,17 @@ function Login({ setEstConnecte }) {
 
     try {
       // Tâche 3.1 & 3.2 : Appel de l'API et stockage automatique du JWT
-      await loginApi(email, password);
+      const data = await loginApi(email, password);
 
-      setEstConnecte(true);
-      navigate(`/${selectedRole}`);
+      // Le rôle fait foi côté serveur : le compte doit correspondre au profil choisi
+      if (data.role !== selectedRole) {
+        logoutApi();
+        const profil = roles.find((r) => r.id === selectedRole)?.title ?? selectedRole;
+        setErreur(`Ce compte n'est pas un compte ${profil}.`);
+        return;
+      }
+
+      navigate(`/${data.role}`, { replace: true });
     } catch (err) {
       // Tâche 3.3 : Affichage dynamique de l'erreur renvoyée par le service
       setErreur(err.message);

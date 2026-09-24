@@ -34,31 +34,28 @@ export async function loginApi(email, password) {
     const data = await response.json();
 
     // Tâche 3.2 : Extraction et sauvegarde du JWT dans le localStorage
-    if (data.access_token) {
-      localStorage.setItem("token", data.access_token);
-    } 
-      if (data.role) {
-        localStorage.setItem("role", data.role);
-      }
-    else {
+    if (!data.access_token || !data.role) {
       throw new Error("Jeton d'accès manquant dans la réponse du serveur.");
     }
+    localStorage.setItem("token", data.access_token);
+    localStorage.setItem("role", data.role);
 
     return data;
   } catch (error) {
     // Tâche 3.3 : Prise en compte du cas où le backend n'est pas démarré (Failed to fetch)
     if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Impossible de contacter le serveur. Le backend est-il démarré ?");
+      throw new Error("Impossible de contacter le serveur. Le backend est-il démarré ?", { cause: error });
     }
     throw error;
   }
 }
 
 /**
- * Permet de déconnecter l'utilisateur en supprimant le token
+ * Déconnecte l'utilisateur : purge le token et le rôle (aucune trace sur le terminal)
  */
 export function logoutApi() {
   localStorage.removeItem("token");
+  localStorage.removeItem("role");
 }
 
 /**
@@ -66,4 +63,29 @@ export function logoutApi() {
  */
 export function getToken() {
   return localStorage.getItem("token");
+}
+
+/**
+ * Récupère le rôle de l'utilisateur connecté ("regulateur" / "brancardier" / "medecin")
+ */
+export function getRole() {
+  return localStorage.getItem("role");
+}
+
+/**
+ * Indique si un token valide et non expiré est stocké.
+ * Un token expiré (au-delà des 8h de garde) est purgé automatiquement.
+ */
+export function estAuthentifie() {
+  const token = getToken();
+  if (!token) return false;
+  try {
+    // Le payload du JWT est la 2e partie, encodée en base64url
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    if (payload.exp * 1000 > Date.now()) return true;
+  } catch {
+    // token mal formé : on le traite comme invalide
+  }
+  logoutApi();
+  return false;
 }
