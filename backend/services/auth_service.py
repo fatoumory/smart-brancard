@@ -11,6 +11,7 @@ from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from database import get_db
+from models.enums import Role
 from models.utilisateur import Utilisateur
 
 load_dotenv()
@@ -81,21 +82,21 @@ def get_current_user(
     if not payload or not str(payload.get("sub", "")).isdigit():
         raise erreur
 
-    # On relit l'utilisateur en base: un compte supprimé n'a plus accès,
+    # On relit l'utilisateur en base: un compte supprimé ou désactivé n'a plus accès,
     # même si son token n'a pas encore expiré
     utilisateur = db.get(Utilisateur, int(payload["sub"]))
-    if utilisateur is None:
+    if utilisateur is None or not utilisateur.est_actif:
         raise erreur
     return utilisateur
 
-def require_role(roles_autorises: list[str]):
+def require_role(roles_autorises: list[Role]):
     """Vérifie que l'utilisateur connecté a le bon rôle
-    Exemple d'utilisation : Depends(require_role(['regulateur', 'medecin']))"""
+    Exemple d'utilisation : Depends(require_role([Role.REGULATEUR, Role.MEDECIN]))"""
     def verifier(current_user: Utilisateur = Depends(get_current_user)) -> Utilisateur:
         if current_user.role not in roles_autorises:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Accès interdit, rôle requis : {roles_autorises}"
+                detail=f"Accès interdit, rôle requis : {[r.value for r in roles_autorises]}"
             )
         return current_user
     return verifier

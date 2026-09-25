@@ -5,8 +5,10 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-import models  # enregistre tous les modèles dans Base.metadata
-from database import engine, Base
+from sqlalchemy import text
+
+import models  # enregistre tous les modèles
+from database import engine
 from routes.auth import router as auth_router
 from routes.utilisateurs import router as utilisateurs_router
 
@@ -28,11 +30,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-#  Création des tables en base 
-# Crée automatiquement toutes les tables définies dans les modèles
-# si elles n'existent pas encore dans PostgreSQL
+#  Vérification de la connexion à la base 
+# Les tables sont créées et mises à jour par les migrations Alembic (alembic upgrade head)
 try:
-    Base.metadata.create_all(bind=engine)
+    with engine.connect() as connexion:
+        connexion.execute(text("SELECT 1"))
 except UnicodeDecodeError as e:
     # Sous Windows, psycopg2 plante en décodant le message d'erreur (en français)
     # de PostgreSQL: on le décode correctement pour afficher la vraie cause

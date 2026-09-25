@@ -2,32 +2,24 @@
 # Schémas Pydantic: valident les données entrantes (JSON) et
 # contrôlent ce qui est renvoyé au frontend (jamais le hash du mot de passe)
 
-from datetime import datetime
-from enum import Enum
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
-
-
-class Role(str, Enum):
-    brancardier = "brancardier"
-    medecin = "medecin"
-    regulateur = "regulateur"
-
-
-class StatutAgent(str, Enum):
-    disponible = "disponible"
-    en_mission = "en_mission"
-    pause = "pause"
-    indisponible = "indisponible"
+from models.enums import Role, StatutAgent
 
 
 class UtilisateurCreate(BaseModel):
     """Données attendues pour créer un compte (POST /auth/register)"""
-    nom: str = Field(min_length=1, max_length=100)
+    nom_utilisateur: str = Field(min_length=3, max_length=254)
     prenom: str = Field(min_length=1, max_length=100)
-    email: EmailStr
+    nom: str = Field(min_length=1, max_length=100)
     mot_de_passe: str = Field(min_length=8)
     role: Role
+
+    @field_validator("nom_utilisateur")
+    @classmethod
+    def normaliser(cls, v: str) -> str:
+        # Identifiant insensible à la casse et sans espaces parasites
+        return v.strip().lower()
 
     @field_validator("mot_de_passe")
     @classmethod
@@ -43,12 +35,14 @@ class UtilisateurOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    nom: str
+    nom_utilisateur: str
     prenom: str
-    email: EmailStr
+    nom: str
     role: Role
-    statut: StatutAgent
-    created_at: datetime
+    est_actif: bool
+    # Renseignés uniquement pour un brancardier
+    statut: StatutAgent | None = None
+    compteur_mission: int | None = None
 
 
 class StatutUpdate(BaseModel):

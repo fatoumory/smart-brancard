@@ -37,10 +37,13 @@ export async function loginApi(email, password) {
     if (!data.access_token || !data.role) {
       throw new Error("Jeton d'accès manquant dans la réponse du serveur.");
     }
+    // Le backend renvoie le rôle en majuscules (ex : "REGULATEUR") ;
+    // le frontend l'utilise en minuscules pour ses routes (/regulateur)
+    const role = data.role.toLowerCase();
     localStorage.setItem("token", data.access_token);
-    localStorage.setItem("role", data.role);
+    localStorage.setItem("role", role);
 
-    return data;
+    return { ...data, role };
   } catch (error) {
     // Tâche 3.3 : Prise en compte du cas où le backend n'est pas démarré (Failed to fetch)
     if (error.name === "TypeError" && error.message.includes("fetch")) {
