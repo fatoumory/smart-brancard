@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-smart_brancard}
+      POSTGRES_DB: ${POSTGRES_DB:-smart_brancard_db}
     ports:
       # Port côté machine configurable (POSTGRES_PORT dans le .env à la racine)
       # si un PostgreSQL local occupe déjà le 5432
