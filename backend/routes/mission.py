@@ -4,15 +4,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models.enums import MethodeVerification, Role, StatutMission, TypeNoeud
-from models.historique import Historique
+from models.enums import Role, StatutMission, TypeNoeud
 from models.mission import Mission
 from models.noeud_hopital import NoeudHopital
 from models.patient import Patient
 from models.utilisateur import Utilisateur
-from schemas.mission import MissionCreate, MissionOut
+from schemas.mission import MissionCreate, MissionOut, HistoriqueOut
 from services.auth_service import require_role
 from services.graphe_service import ItineraireIntrouvable, calculer_itineraire, noms_des_noeuds
+from services.historique_service import changer_statut, historique_de
 
 # Préfixe commun à toutes les routes de ce fichier: /missions/...
 router = APIRouter(prefix="/missions", tags=["Missions"])
@@ -89,12 +89,12 @@ def creer_mission(
         ) from None
 
     # 4. Enregistrement de la mission : l'itinéraire est stocké en texte JSON, ex. "[1, 5, 8]"
+    # Le statut n'est pas donné ici : c'est changer_statut qui le fixe (étape 5)
     mission = Mission(
         niveau_urgence=donnees.niveau_urgence,
         materiel_requis=donnees.materiel_requis,
         materiel_deja_dispo=donnees.materiel_deja_dispo,
         consigne=donnees.consigne,
-        statut=StatutMission.EN_ATTENTE,
         itineraire=json.dumps(chemin),
         patient_id=patient.id,
         prescripteur_id=current_user.id,
@@ -105,14 +105,52 @@ def creer_mission(
     db.flush()  # attribue un id à la mission, nécessaire pour l'historique
 
     # 5. Première ligne du journal d'audit : création de la demande (CDC §7.3)
-    db.add(Historique(
-        mission_id=mission.id,
-        auteur_id=current_user.id,
-        statut_modifie_en=StatutMission.EN_ATTENTE,
-        methode_verification=MethodeVerification.MANUEL,
-    ))
+    # 5. Statut EN_ATTENTE + première ligne du journal d'audit : création de la demande (CDC §7.3)
+    changer_statut(db, mission, StatutMission.EN_ATTENTE, auteur_id=current_user.id)
+
 
     # Mission et historique sont enregistrés ensemble : tout ou rien
     db.commit()
     db.refresh(mission)
     return vers_mission_out(db, mission, duree)
+
+def mission_visible(db: Session, mission_id: int, utilisateur: Utilisateur) -> Mission:
+    """Renvoie la mission si l'utilisateur a le droit de la voir, sinon 404.
+    Le régulateur voit tout ; un prescripteur ne voit que les missions qu'il a demandées.
+    On répond 404 (et non 403) pour ne pas révéler qu'une mission existe."""
+    mission = db.get(Mission, mission_id)
+    if mission is None or (utilisateur.role == Role.MEDECIN
+                            and mission.prescripteur_id != utilisateur.id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Mission introuvable"
+        )
+    return mission
+
+
+#  Historique d'une mission (journal d'audit)
+# Sert au suivi de la demande (médecin) et au contrôle (régulateur)
+@router.get("/{mission_id}/historique", response_model=list[HistoriqueOut])
+def lire_historique(
+    mission_id: int,
+    db: Session = Depends(get_db),
+    current_user: Utilisateur = Depends(require_role([Role.REGULATEUR, Role.MEDECIN]))
+):
+    mission_visible(db, mission_id, current_user)
+    lignes = historique_de(db, mission_id)
+
+    # Nom des auteurs, en une seule requête ("Algorithme" côté frontend si auteur vide)
+    ids = {l.auteur_id for l in lignes if l.auteur_id is not None}
+    auteurs = {u.id: f"{u.prenom} {u.nom}"
+                for u in db.query(Utilisateur).filter(Utilisateur.id.in_(ids))}
+
+    return [HistoriqueOut(
+        id=l.id,
+        statut_modifie_en=l.statut_modifie_en,
+        horodatage=l.horodatage,
+        auteur_id=l.auteur_id,
+        auteur_nom=auteurs.get(l.auteur_id),
+        methode_verification=l.methode_verification,
+        motif_refus=l.motif_refus,
+    ) for l in lignes]
+

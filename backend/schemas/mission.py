@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, model_validator
 
-from models.enums import Materiel, NiveauUrgence, StatutMission
+from models.enums import Materiel, MethodeVerification, MotifRefus, NiveauUrgence, StatutMission
 
 
 class MissionCreate(BaseModel):
@@ -28,6 +28,16 @@ class MissionCreate(BaseModel):
             raise ValueError("Le départ et l'arrivée doivent être différents")
         return self
 
+class HistoriqueOut(BaseModel):
+    """Une ligne du journal d'audit d'une mission"""
+    id: int
+    statut_modifie_en: StatutMission
+    horodatage: datetime
+    # Vide (None) quand c'est l'algorithme qui a agi
+    auteur_id: int | None
+    auteur_nom: str | None
+    methode_verification: MethodeVerification
+    motif_refus: MotifRefus | None
 
 class MissionOut(BaseModel):
     """Mission renvoyée au frontend, avec les noms utiles à l'affichage"""
