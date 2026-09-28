@@ -21,6 +21,10 @@ class Mission(Base):
     materiel_requis = Column(Enum(Materiel, name="materiel"), nullable=False, default=Materiel.RIEN)
     materiel_deja_dispo = Column(Boolean, nullable=False, default=False)
 
+    # Consigne de sécurité pour le brancardier (ex : "Patient sous O2, manipuler avec précaution")
+    # Facultative ; affichée au brancardier avec les données logistiques
+    consigne = Column(Text, nullable=True)
+
     # Statut de la mission: chaque changement est tracé dans la table historiques
     statut = Column(Enum(StatutMission, name="statut_mission"), nullable=False,
                     default=StatutMission.EN_ATTENTE, index=True)
@@ -29,12 +33,12 @@ class Mission(Base):
     itineraire = Column(Text, nullable=True)
 
     date_creation = Column(DateTime(timezone=True), nullable=False,
-                           default=lambda: datetime.now(timezone.utc))
+                        default=lambda: datetime.now(timezone.utc))
 
     # Patient transporté
     patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
 
-    # Médecin (ou régulateur) qui a prescrit le transport
+    # Prescripteur(médecin ou infirmier) qui a demandé le transport
     prescripteur_id = Column(Integer, ForeignKey("utilisateurs.id"), nullable=False)
 
     # Brancardier assigné: vide tant que la mission n'est pas attribuée
@@ -44,3 +48,5 @@ class Mission(Base):
     # Trajet : nœuds de départ et d'arrivée dans le graphe de l'hôpital
     noeud_source_id = Column(Integer, ForeignKey("noeuds_hopital.id"), nullable=False)
     noeud_destination_id = Column(Integer, ForeignKey("noeuds_hopital.id"), nullable=False)
+    
+    

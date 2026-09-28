@@ -11,7 +11,8 @@ import models  # enregistre tous les modèles
 from database import engine
 from routes.auth import router as auth_router
 from routes.utilisateurs import router as utilisateurs_router
-from routes.graphe import router as graphe_router          
+from routes.graphe import router as graphe_router      
+from routes.mission import router as missions_router    
 
 
 #  Création de l'application FastAPI 
@@ -49,7 +50,8 @@ except UnicodeDecodeError as e:
 #  Enregistrement des routes 
 app.include_router(auth_router)          # /auth/...
 app.include_router(utilisateurs_router)  # /utilisateurs/...
-app.include_router(graphe_router)        # /aretes/... 
+app.include_router(graphe_router)        # /aretes/...
+app.include_router(missions_router)      #/missions/
 
 
 #  Route de test 
