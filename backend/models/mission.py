@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, Text
+from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, Text
 from database import Base
 from models.enums import Materiel, NiveauUrgence, StatutMission
 
@@ -31,6 +31,12 @@ class Mission(Base):
 
     # Itinéraire calculé par Dijkstra (liste des nœuds traversés)
     itineraire = Column(Text, nullable=True)
+    
+    
+    # Durée du trajet estimée par Dijkstra au moment de la demande, en minutes
+    # (on la garde pour la comparer plus tard à la durée réelle)
+    duree_estimee = Column(Float, nullable=True)
+
 
     date_creation = Column(DateTime(timezone=True), nullable=False,
                         default=lambda: datetime.now(timezone.utc))

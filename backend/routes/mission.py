@@ -1,10 +1,11 @@
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import case
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models.enums import Role, StatutMission, TypeNoeud
+from models.enums import NiveauUrgence, Role, StatutMission, TypeNoeud
 from models.mission import Mission
 from models.noeud_hopital import NoeudHopital
 from models.patient import Patient
@@ -29,7 +30,7 @@ def service_existant(db: Session, noeud_id: int, role_du_noeud: str) -> NoeudHop
     return noeud
 
 
-def vers_mission_out(db: Session, mission: Mission, duree: float) -> MissionOut:
+def vers_mission_out(db: Session, mission: Mission) -> MissionOut:
     """Complète la mission avec le patient et les noms des nœuds pour le frontend"""
     patient = db.get(Patient, mission.patient_id)
     itineraire = json.loads(mission.itineraire)
@@ -54,7 +55,7 @@ def vers_mission_out(db: Session, mission: Mission, duree: float) -> MissionOut:
         noeud_destination_nom=noms[-1],
         itineraire=itineraire,
         itineraire_noms=noms,
-        duree_estimee=duree,
+        duree_estimee=mission.duree_estimee,
     )
 
 
@@ -96,6 +97,7 @@ def creer_mission(
         materiel_deja_dispo=donnees.materiel_deja_dispo,
         consigne=donnees.consigne,
         itineraire=json.dumps(chemin),
+        duree_estimee=duree,
         patient_id=patient.id,
         prescripteur_id=current_user.id,
         noeud_source_id=donnees.noeud_source_id,
@@ -104,15 +106,14 @@ def creer_mission(
     db.add(mission)
     db.flush()  # attribue un id à la mission, nécessaire pour l'historique
 
-    # 5. Première ligne du journal d'audit : création de la demande (CDC §7.3)
-    # 5. Statut EN_ATTENTE + première ligne du journal d'audit : création de la demande (CDC §7.3)
+    # 5. Statut EN_ATTENTE + première ligne du journal d'audit : création de la demande 
     changer_statut(db, mission, StatutMission.EN_ATTENTE, auteur_id=current_user.id)
 
 
     # Mission et historique sont enregistrés ensemble : tout ou rien
     db.commit()
     db.refresh(mission)
-    return vers_mission_out(db, mission, duree)
+    return vers_mission_out(db, mission)
 
 def mission_visible(db: Session, mission_id: int, utilisateur: Utilisateur) -> Mission:
     """Renvoie la mission si l'utilisateur a le droit de la voir, sinon 404.
@@ -154,3 +155,44 @@ def lire_historique(
         motif_refus=l.motif_refus,
     ) for l in lignes]
 
+
+# Ordre de priorité : URGENT d'abord (un tri alphabétique donnerait BASSE, HAUTE, MOYENNE, URGENT)
+ORDRE_URGENCE = case(
+    {NiveauUrgence.URGENT: 0, NiveauUrgence.HAUTE: 1,
+    NiveauUrgence.MOYENNE: 2, NiveauUrgence.BASSE: 3},
+    value=Mission.niveau_urgence,
+)
+
+
+# Liste des missions (dashboard du régulateur, « mes demandes » du médecin)
+# Exemples : GET /missions?statut=EN_ATTENTE&statut=PROPOSE    GET /missions?niveau_urgence=URGENT
+@router.get("", response_model=list[MissionOut])
+def lister_missions(
+    statut: list[StatutMission] | None = Query(default=None),
+    niveau_urgence: NiveauUrgence | None = None,
+    limite: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: Utilisateur = Depends(require_role([Role.REGULATEUR, Role.MEDECIN]))
+):
+    requete = db.query(Mission)
+    # Un prescripteur ne voit que ses propres demandes
+    if current_user.role == Role.MEDECIN:
+        requete = requete.filter(Mission.prescripteur_id == current_user.id)
+    if statut:
+        requete = requete.filter(Mission.statut.in_(statut))
+    if niveau_urgence is not None:
+        requete = requete.filter(Mission.niveau_urgence == niveau_urgence)
+
+    # Les plus urgentes d'abord ; à urgence égale, la plus ancienne d'abord (file d'attente)
+    missions = requete.order_by(ORDRE_URGENCE, Mission.date_creation, Mission.id).limit(limite).all()
+    return [vers_mission_out(db, m) for m in missions]
+
+
+#  Détail d'une mission (suivi de la demande)
+@router.get("/{mission_id}", response_model=MissionOut)
+def lire_mission(
+    mission_id: int,
+    db: Session = Depends(get_db),
+    current_user: Utilisateur = Depends(require_role([Role.REGULATEUR, Role.MEDECIN]))
+):
+    return vers_mission_out(db, mission_visible(db, mission_id, current_user))

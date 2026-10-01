@@ -14,7 +14,7 @@ from routes.utilisateurs import router as utilisateurs_router
 from routes.graphe import router as graphe_router      
 from routes.mission import router as missions_router  
 from routes.patient import router as patients_router
-  
+from routes.graphe import router_noeuds as noeuds_router  
 
 
 #  Création de l'application FastAPI 
@@ -55,7 +55,7 @@ app.include_router(utilisateurs_router)  # /utilisateurs/...
 app.include_router(graphe_router)        # /aretes/...
 app.include_router(missions_router)      #/missions/
 app.include_router(patients_router)      # /patients/...
-
+app.include_router(noeuds_router)        # /noeuds/...
 
 #  Route de test 
 @app.get("/")

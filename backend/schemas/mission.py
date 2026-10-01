@@ -65,5 +65,6 @@ class MissionOut(BaseModel):
     # Itinéraire calculé par Dijkstra : id des nœuds traversés, et leurs noms dans le même ordre
     itineraire: list[int]
     itineraire_noms: list[str]
-    # Durée estimée du trajet en minutes (somme des poids de l'itinéraire)
-    duree_estimee: float
+    # Durée estimée du trajet en minutes, calculée à la création (vide pour les missions plus anciennes)
+    duree_estimee: float | None
+

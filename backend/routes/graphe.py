@@ -4,14 +4,32 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models.enums import Role
+from models.enums import Role, TypeNoeud
 from models.noeud_hopital import Arete, NoeudHopital
 from models.utilisateur import Utilisateur
-from schemas.graphe import AreteBlocage, AreteOut
-from services.auth_service import require_role
+from schemas.graphe import AreteBlocage, AreteOut, NoeudOut
+from services.auth_service import get_current_user, require_role
 
-# Préfixe commun à toutes les routes de ce fichier: /aretes/...
+# Deux groupes de routes dans ce fichier : /aretes/... et /noeuds/...
 router = APIRouter(prefix="/aretes", tags=["Graphe de l'hôpital"])
+router_noeuds = APIRouter(prefix="/noeuds", tags=["Graphe de l'hôpital"])
+
+
+# Liste des lieux de l'hôpital (tout utilisateur connecté)
+# Exemple : GET /noeuds?type_noeud=SERVICE pour les listes « départ » et « arrivée » du formulaire
+@router_noeuds.get("", response_model=list[NoeudOut])
+def lister_noeuds(
+    type_noeud: TypeNoeud | None = None,
+    etage: int | None = None,
+    db: Session = Depends(get_db),
+    _: Utilisateur = Depends(get_current_user)
+):
+    requete = db.query(NoeudHopital)
+    if type_noeud is not None:
+        requete = requete.filter(NoeudHopital.type_noeud == type_noeud)
+    if etage is not None:
+        requete = requete.filter(NoeudHopital.etage == etage)
+    return requete.order_by(NoeudHopital.etage, NoeudHopital.nom_salle).all()
 
 
 def vers_arete_out(arete: Arete, noms: dict[int, str]) -> AreteOut:
