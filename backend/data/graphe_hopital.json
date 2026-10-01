@@ -1,0 +1,68 @@
+{
+  "_commentaire": "Graphe simplifié de l'hôpital pour Dijkstra. 20 nœuds sur 2 niveaux (etage 0 = RDC, etage 1 = étage 1), reliés par 2 ascenseurs, sans escalier. Les arêtes se parcourent dans les deux sens. Le poids est un temps de trajet en MINUTES (environ 60 m par minute avec un brancard). Les champs qui commencent par _ sont des commentaires : le chargement les ignore.",
+
+  "noeuds": [
+    { "_commentaire": "RDC, côté ouest (près de l'ascenseur A)" },
+    { "id": 1,  "nom_salle": "Urgences",                "etage": 0, "type_noeud": "SERVICE",        "uid_tag_nfc": "NFC-RDC-URG" },
+    { "id": 2,  "nom_salle": "Radiologie",              "etage": 0, "type_noeud": "SERVICE",        "uid_tag_nfc": "NFC-RDC-RAD" },
+    { "id": 5,  "nom_salle": "Couloir Ouest - RDC",     "etage": 0, "type_noeud": "COULOIR",        "uid_tag_nfc": null },
+    { "id": 8,  "nom_salle": "Ascenseur A - RDC",       "etage": 0, "type_noeud": "ASCENSEUR",      "uid_tag_nfc": null },
+
+    { "_commentaire": "RDC, centre" },
+    { "id": 6,  "nom_salle": "Hall central - RDC",      "etage": 0, "type_noeud": "COULOIR",        "uid_tag_nfc": null },
+    { "id": 3,  "nom_salle": "Consultations externes",  "etage": 0, "type_noeud": "SERVICE",        "uid_tag_nfc": "NFC-RDC-CONS" },
+    { "_commentaire": "Un dépôt par étage, avec les 3 matériels (fauteuils, lits, oxygène) : on se sert toujours à l'étage du patient" },
+    { "id": 10, "nom_salle": "Dépôt matériel - RDC",    "etage": 0, "type_noeud": "DEPOT_MATERIEL", "uid_tag_nfc": "NFC-RDC-DEP" },
+
+    { "_commentaire": "RDC, côté est (près de l'ascenseur B)" },
+    { "id": 7,  "nom_salle": "Couloir Est - RDC",       "etage": 0, "type_noeud": "COULOIR",        "uid_tag_nfc": null },
+    { "id": 4,  "nom_salle": "Laboratoire",             "etage": 0, "type_noeud": "SERVICE",        "uid_tag_nfc": "NFC-RDC-LAB" },
+    { "id": 9,  "nom_salle": "Ascenseur B - RDC",       "etage": 0, "type_noeud": "ASCENSEUR",      "uid_tag_nfc": null },
+
+    { "_commentaire": "Étage 1, côté ouest (près de l'ascenseur A)" },
+    { "id": 11, "nom_salle": "Bloc opératoire",         "etage": 1, "type_noeud": "SERVICE",        "uid_tag_nfc": "NFC-E1-BLOC" },
+    { "id": 12, "nom_salle": "Salle de réveil",         "etage": 1, "type_noeud": "SERVICE",        "uid_tag_nfc": "NFC-E1-REV" },
+    { "id": 15, "nom_salle": "Couloir Ouest - Étage 1", "etage": 1, "type_noeud": "COULOIR",        "uid_tag_nfc": null },
+    { "id": 18, "nom_salle": "Ascenseur A - Étage 1",   "etage": 1, "type_noeud": "ASCENSEUR",      "uid_tag_nfc": null },
+
+    { "_commentaire": "Étage 1, centre" },
+    { "id": 16, "nom_salle": "Palier central - Étage 1","etage": 1, "type_noeud": "COULOIR",        "uid_tag_nfc": null },
+    { "id": 20, "nom_salle": "Dépôt matériel - Étage 1","etage": 1, "type_noeud": "DEPOT_MATERIEL", "uid_tag_nfc": "NFC-E1-DEP" },
+
+    { "_commentaire": "Étage 1, côté est (près de l'ascenseur B)" },
+    { "id": 17, "nom_salle": "Couloir Est - Étage 1",   "etage": 1, "type_noeud": "COULOIR",        "uid_tag_nfc": null },
+    { "id": 13, "nom_salle": "Réanimation",             "etage": 1, "type_noeud": "SERVICE",        "uid_tag_nfc": "NFC-E1-REA" },
+    { "id": 14, "nom_salle": "Cardiologie",             "etage": 1, "type_noeud": "SERVICE",        "uid_tag_nfc": "NFC-E1-CARD" },
+    { "id": 19, "nom_salle": "Ascenseur B - Étage 1",   "etage": 1, "type_noeud": "ASCENSEUR",      "uid_tag_nfc": null }
+  ],
+
+  "aretes": [
+    { "_commentaire": "RDC : chaque service est relié à un couloir" },
+    { "noeud_a_id": 1,  "noeud_b_id": 5,  "poids": 0.5,  "est_bloque": false },
+    { "noeud_a_id": 2,  "noeud_b_id": 5,  "poids": 0.75, "est_bloque": false },
+    { "noeud_a_id": 5,  "noeud_b_id": 8,  "poids": 0.25, "est_bloque": false },
+    { "noeud_a_id": 5,  "noeud_b_id": 6,  "poids": 1.0,  "est_bloque": false },
+    { "noeud_a_id": 3,  "noeud_b_id": 6,  "poids": 0.5,  "est_bloque": false },
+    { "noeud_a_id": 10, "noeud_b_id": 6,  "poids": 0.5,  "est_bloque": false },
+    { "noeud_a_id": 6,  "noeud_b_id": 7,  "poids": 1.0,  "est_bloque": false },
+    { "noeud_a_id": 4,  "noeud_b_id": 7,  "poids": 0.5,  "est_bloque": false },
+    { "noeud_a_id": 7,  "noeud_b_id": 9,  "poids": 0.25, "est_bloque": false },
+
+    { "_commentaire": "Ascenseurs : seule liaison entre les deux étages. Poids = attente moyenne + trajet" },
+    { "_commentaire": "Ascenseur A : très sollicité (proche des urgences), attente 2 min + trajet 0,5 min" },
+    { "noeud_a_id": 8,  "noeud_b_id": 18, "poids": 2.5,  "est_bloque": false },
+    { "_commentaire": "Ascenseur B : moins sollicité, attente 1 min + trajet 0,5 min" },
+    { "noeud_a_id": 9,  "noeud_b_id": 19, "poids": 1.5,  "est_bloque": false },
+
+    { "_commentaire": "Étage 1 : même organisation qu'au RDC" },
+    { "noeud_a_id": 18, "noeud_b_id": 15, "poids": 0.25, "est_bloque": false },
+    { "noeud_a_id": 11, "noeud_b_id": 15, "poids": 0.5,  "est_bloque": false },
+    { "noeud_a_id": 12, "noeud_b_id": 15, "poids": 0.5,  "est_bloque": false },
+    { "noeud_a_id": 15, "noeud_b_id": 16, "poids": 1.0,  "est_bloque": false },
+    { "noeud_a_id": 20, "noeud_b_id": 16, "poids": 0.5,  "est_bloque": false },
+    { "noeud_a_id": 16, "noeud_b_id": 17, "poids": 1.0,  "est_bloque": false },
+    { "noeud_a_id": 13, "noeud_b_id": 17, "poids": 0.5,  "est_bloque": false },
+    { "noeud_a_id": 14, "noeud_b_id": 17, "poids": 0.75, "est_bloque": false },
+    { "noeud_a_id": 17, "noeud_b_id": 19, "poids": 0.25, "est_bloque": false }
+  ]
+}

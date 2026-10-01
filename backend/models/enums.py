@@ -55,6 +55,17 @@ class MotifRefus(str, Enum):
     URGENCE_PRIORITAIRE = "URGENCE_PRIORITAIRE"
     FIN_SERVICE = "FIN_SERVICE"
 
+class Sexe(str, Enum):
+    MASCULIN = "MASCULIN"
+    FEMININ = "FEMININ"
+    INDETERMINE = "INDETERMINE"
+
+
+class StatutIdentite(str, Enum):
+    # PROVISOIRE : patient admis sans identité connue (ex : inconscient), à compléter plus tard
+    PROVISOIRE = "PROVISOIRE"
+    VALIDEE = "VALIDEE"
+
 
 class TypeNoeud(str, Enum):
     SERVICE = "SERVICE"
