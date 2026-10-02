@@ -1,6 +1,6 @@
 // src/services/authService.js
 
-const API_URL = "http://localhost:8000"; // Adapte le port si ton backend tourne sur un autre port
+import { API_URL } from "../config";
 
 /**
  * Envoie les identifiants au backend et stocke le token JWT en cas de succès.
@@ -76,19 +76,29 @@ export function getRole() {
 }
 
 /**
+ * Lit les informations contenues dans le jeton JWT (id, rôle, nom, prénom, expiration).
+ * Renvoie null si aucun jeton n'est stocké ou s'il est mal formé.
+ */
+export function lireJeton() {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    // Le payload du JWT est la 2e partie, encodée en base64url (UTF-8 pour les accents)
+    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const octets = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(octets));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Indique si un token valide et non expiré est stocké.
  * Un token expiré (au-delà des 8h de garde) est purgé automatiquement.
  */
 export function estAuthentifie() {
-  const token = getToken();
-  if (!token) return false;
-  try {
-    // Le payload du JWT est la 2e partie, encodée en base64url
-    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    if (payload.exp * 1000 > Date.now()) return true;
-  } catch {
-    // token mal formé : on le traite comme invalide
-  }
+  const payload = lireJeton();
+  if (payload && payload.exp * 1000 > Date.now()) return true;
   logoutApi();
   return false;
 }

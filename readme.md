@@ -52,6 +52,12 @@ npm run dev
 ```
 L'application est disponible sur http://localhost:5173.
 
+Si le backend ne tourne pas sur http://localhost:8000, copier `frontend\.env.example` en `frontend\.env.local` et modifier `VITE_API_URL`.
+
+**5. Comptes et données de test**
+
+Le régulateur crée les autres comptes depuis http://localhost:8000/docs (`POST /auth/register`, rôle `MEDECIN` ou `BRANCARDIER`). Il n'y a pas encore d'écran d'admission : pour tester l'interface Médecin, admettre d'abord un patient avec `POST /patients`, connecté en médecin.
+
 **Après chaque `git pull`** : relancer `pip install -r requirements.txt` et `alembic upgrade head` dans `backend/`.
 
 ## Rôles
@@ -108,6 +114,49 @@ backend/
 └── tests/        Tests automatiques (pytest)
 ```
 
+## Les écrans
+
+Après la connexion, chaque rôle arrive sur son propre écran. Un utilisateur qui tape l'adresse d'un autre écran est renvoyé vers le sien.
+
+| Écran | Adresse | Contenu |
+|---|---|---|
+| Connexion | `/login` | Choix du profil, puis identifiant et mot de passe. Le compte doit correspondre au profil choisi |
+| Dashboard du régulateur | `/regulateur` | 4 indicateurs, file des missions triée par urgence avec filtres, itinéraire étape par étape (clic sur une ligne), agents et leur statut, activité de la journée. Rafraîchi toutes les 15 s |
+| Demande de transport | `/medecin` | Recherche du patient admis (nom, prénom ou IPP), urgence et délai garanti, départ et arrivée choisis parmi les services, matériel, consigne |
+| Suivi de la demande | `/medecin/suivi/{id}` | Les 4 étapes de la mission, avec l'heure de chacune lue dans le journal d'audit |
+| Brancardier | `/brancardier` | Page provisoire : l'application mobile arrive au Sprint 3 |
+
+Délais garantis selon l'urgence : **URGENT 3 min**, **HAUTE 8 min**, **MOYENNE 15 min**, **BASSE 30 min**.
+
+## Application installable (PWA)
+
+Le frontend est une Progressive Web App : on l'installe depuis le navigateur, sans passer par un store, et elle s'ouvre en plein écran comme une application.
+
+Pour l'essayer, dans `frontend/` :
+```powershell
+npm run build
+npm run preview
+```
+Ouvrir http://localhost:4173 dans Chrome, puis cliquer sur l'icône « Installer » de la barre d'adresse.
+
+- Le service worker ne met en cache que les fichiers de l'application (JS, CSS, icônes), **jamais les réponses de l'API** : aucune donnée patient ne reste sur l'appareil (CDC §7.2).
+- Une nouvelle version déployée est récupérée automatiquement.
+- Sur un vrai téléphone, l'installation exige le HTTPS (prévu au Sprint 3).
+- Les icônes sont générées à partir de `frontend/public/logo.svg` avec `npm run generate-pwa-assets`.
+
+## Organisation du frontend
+
+```
+frontend/src/
+├── pages/        Un fichier par écran (Login, Regulateur, Medecin, SuiviDemande, Brancardier)
+├── components/   Éléments réutilisables : en-tête, badges, recherche de patient, cartes du dashboard
+├── services/     Appels à l'API (api.js ajoute le jeton JWT), connexion, libellés des urgences et statuts
+├── hooks/        useDonnees : chargement des données et rafraîchissement automatique
+└── routes/       RouteProtegee : accès à un écran selon le rôle
+```
+
+Les valeurs échangées avec l'API (urgences, statuts, matériel…) sont celles des énumérations du backend (`backend/models/enums.py`). Leurs libellés et leurs couleurs sont définis une seule fois, dans `frontend/src/services/referentiel.js`.
+
 ## Tests
 
 Dans `backend/`, avec le venv activé :
@@ -116,18 +165,27 @@ pytest -q
 ```
 Les tests utilisent une base SQLite temporaire : Docker n'est pas nécessaire.
 
+Dans `frontend/`, vérification du code et compilation :
+```powershell
+npm run lint
+npm run build
+```
+
 ## Choix importants
 
 - **Admission des patients** : le patient est enregistré à son arrivée (IPP généré). Une mission ne crée jamais de patient. Ce module simule le logiciel d'admission de l'hôpital. Dans un vrai déploiement, il pourrait être remplacé par un connecteur HL7 ou FHIR.
 - **Identité provisoire** : un patient inconscient est admis sous le nom « INCONNU X-&lt;IPP&gt; », transporté normalement, puis identifié plus tard.
 - **Journal d'audit immuable** : chaque changement de statut d'une mission ajoute une ligne horodatée. Un déclencheur PostgreSQL interdit de les modifier ou de les supprimer (CDC §7.3).
 - **Aucune donnée clinique** n'est stockée, seulement l'identité et la logistique du transport (CDC §7.2).
+- **Session de 8 h côté frontend** : le jeton JWT est gardé dans le navigateur. Un jeton expiré, ou une réponse 401 de l'API, renvoie à l'écran de connexion. La déconnexion efface le jeton et le rôle.
+- **Rafraîchissement périodique** : le dashboard se met à jour toutes les 15 s et le suivi du médecin se rafraîchit à la demande. Les WebSockets du Sprint 4 remplaceront ces mécanismes.
 
 ## Avancement
 
 - [x] Sprint 0 : environnement (Docker, PostgreSQL + PostGIS, Redis)
 - [x] Sprint 1 : authentification JWT, rôles, modèles de données
 - [x] Sprint 2 (backend) : graphe, Dijkstra, missions, admission des patients, historique, routes de lecture
+- [x] Sprint 2 (frontend) : application installable (PWA), dashboard du régulateur, demande de transport et suivi du médecin
 - [ ] Sprint 3 : attribution automatique, application mobile du brancardier, scans NFC et QR
 - [ ] Sprint 4 : dictée vocale (Whisper), temps réel (WebSockets, Redis)
 - [ ] Sprint 5 : tests de charge (Locust), données MIMIC-III, lancement en une commande

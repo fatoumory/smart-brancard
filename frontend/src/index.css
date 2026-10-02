@@ -1,1 +1,13 @@
 @import "tailwindcss";
+
+/* Couleurs de la maquette Figma, utilisables comme classes Tailwind (ex : bg-primaire, text-primaire) */
+@theme {
+  --color-primaire: #1565c0;
+  --color-primaire-fonce: #0d47a1;
+  --color-primaire-clair: #e3ecf7;
+}
+
+body {
+  background-color: #eef2f6;
+  color: #0f172a;
+}
