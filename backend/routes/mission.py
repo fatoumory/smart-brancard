@@ -13,6 +13,7 @@ from models.utilisateur import Utilisateur
 from schemas.mission import MissionCreate, MissionOut, HistoriqueOut
 from services.auth_service import require_role
 from services.graphe_service import ItineraireIntrouvable, calculer_itineraire, noms_des_noeuds
+from services.assignation_service import traiter_file_attente
 from services.historique_service import changer_statut, historique_de
 
 # Préfixe commun à toutes les routes de ce fichier: /missions/...
@@ -112,6 +113,10 @@ def creer_mission(
 
     # Mission et historique sont enregistrés ensemble : tout ou rien
     db.commit()
+
+    # 6. Assignation automatique (CDC §5.3) : la mission est proposée au meilleur agent libre.
+    #    Si personne n'est disponible, elle reste EN_ATTENTE dans la file.
+    traiter_file_attente(db)
     db.refresh(mission)
     return vers_mission_out(db, mission)
 
