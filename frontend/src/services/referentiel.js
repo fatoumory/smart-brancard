@@ -20,6 +20,7 @@ export const URGENCES = {
 export const STATUTS_MISSION = {
   EN_ATTENTE: { libelle: "En attente", classe: "bg-slate-100 text-slate-700" },
   PROPOSE: { libelle: "Proposé", classe: "bg-blue-50 text-blue-700" },
+  ACCEPTE: { libelle: "Accepté", classe: "bg-indigo-50 text-indigo-700" },
   EN_TRANSIT: { libelle: "En transit", classe: "bg-amber-50 text-amber-700" },
   TERMINE: { libelle: "Terminé", classe: "bg-emerald-50 text-emerald-700" },
   ANNULE: { libelle: "Annulé", classe: "bg-red-50 text-red-600" },

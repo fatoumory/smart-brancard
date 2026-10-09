@@ -22,6 +22,8 @@ class StatutAgent(str, Enum):
 class StatutMission(str, Enum):
     EN_ATTENTE = "EN_ATTENTE"
     PROPOSE = "PROPOSE"
+    # Le brancardier a accepté la mission et rejoint le patient (avant le scan de départ)
+    ACCEPTE = "ACCEPTE"
     EN_TRANSIT = "EN_TRANSIT"
     TERMINE = "TERMINE"
     ANNULE = "ANNULE"

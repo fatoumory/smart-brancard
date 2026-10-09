@@ -2,6 +2,8 @@
 # Schémas Pydantic: valident les données entrantes (JSON) et
 # contrôlent ce qui est renvoyé au frontend (jamais le hash du mot de passe)
 
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from models.enums import Role, StatutAgent
@@ -43,6 +45,10 @@ class UtilisateurOut(BaseModel):
     # Renseignés uniquement pour un brancardier
     statut: StatutAgent | None = None
     compteur_mission: int | None = None
+    # Position actuelle d'un brancardier : sa dernière détection de balise (vide si jamais détecté)
+    position_noeud_id: int | None = None
+    position_noeud_nom: str | None = None
+    position_date: datetime | None = None
 
 
 class StatutUpdate(BaseModel):
