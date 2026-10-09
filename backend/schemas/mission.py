@@ -72,4 +72,6 @@ class MissionOut(BaseModel):
     itineraire_noms: list[str]
     # Durée estimée du trajet en minutes, calculée à la création (vide pour les missions plus anciennes)
     duree_estimee: float | None
+    # Mission PROPOSE : heure limite de réponse de l'agent (compte à rebours du téléphone)
+    fin_reponse: datetime | None = None
 

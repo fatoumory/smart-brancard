@@ -14,7 +14,7 @@ import math
 from datetime import date, datetime, timedelta, timezone
 
 import networkx as nx
-from sqlalchemy import case
+from sqlalchemy import case, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -232,3 +232,50 @@ def gerer_reprise_service_auto(db: Session) -> int:
     if agents:
         traiter_file_attente(db)
     return len(agents)
+
+
+#  Délai de réponse à une proposition (CDC §5.3, maquette : « Répondez dans 30 s »)
+
+DELAI_REPONSE = timedelta(seconds=30)
+
+
+def date_proposition(db: Session, mission_id: int) -> datetime | None:
+    """Heure de la dernière proposition de la mission (lue dans le journal d'audit)"""
+    return (db.query(func.max(Historique.horodatage))
+            .filter(Historique.mission_id == mission_id,
+                    Historique.statut_modifie_en == StatutMission.PROPOSE)
+            .scalar())
+
+
+def gerer_propositions_expirees(db: Session, instant: datetime | None = None) -> int:
+    """Sans réponse 30 s après la proposition : l'agent passe INDISPONIBLE (il n'est peut-être
+    plus joignable) et la mission repart vers un autre agent.
+    Appelé régulièrement par la tâche de fond. `instant` permet aux tests de simuler l'heure.
+    Renvoie le nombre de propositions expirées."""
+    limite = (instant or maintenant()) - DELAI_REPONSE
+
+    # Dernière proposition de chaque mission
+    derniere = (db.query(Historique.mission_id, func.max(Historique.horodatage).label("proposee_a"))
+                .filter(Historique.statut_modifie_en == StatutMission.PROPOSE)
+                .group_by(Historique.mission_id)
+                .subquery())
+    # Verrou : une mission que l'agent est en train d'accepter (déjà verrouillée) est laissée de côté
+    expirees = (db.query(Mission)
+                .join(derniere, derniere.c.mission_id == Mission.id)
+                .filter(Mission.statut == StatutMission.PROPOSE, derniere.c.proposee_a <= limite)
+                .with_for_update(skip_locked=True, of=Mission)
+                .all())
+
+    for mission in expirees:
+        agent = db.get(Brancardier, mission.brancardier_id)
+        if agent is not None:
+            agent.statut = StatutAgent.INDISPONIBLE
+            agent.fin_pause = None
+        mission.brancardier_id = None
+        # Retour en attente décidé par le système (auteur vide), sans motif : ce n'est pas un refus
+        changer_statut(db, mission, StatutMission.EN_ATTENTE, auteur_id=None)
+    db.commit()
+
+    if expirees:
+        traiter_file_attente(db)
+    return len(expirees)

@@ -13,7 +13,8 @@ from models.utilisateur import Brancardier, Utilisateur
 from schemas.mission import MissionCreate, MissionOut, HistoriqueOut, RefusMission
 from services.auth_service import require_role
 from services.graphe_service import ItineraireIntrouvable, calculer_itineraire, noms_des_noeuds
-from services.assignation_service import (MissionNonProposee, ReponseImpossible, accepter_mission,
+from services.assignation_service import (DELAI_REPONSE, MissionNonProposee, ReponseImpossible,
+                                         accepter_mission, date_proposition,
                                          refuser_mission, traiter_file_attente)
 from services.historique_service import changer_statut, historique_de
 
@@ -37,6 +38,11 @@ def vers_mission_out(db: Session, mission: Mission) -> MissionOut:
     patient = db.get(Patient, mission.patient_id)
     itineraire = json.loads(mission.itineraire)
     noms = noms_des_noeuds(db, itineraire)
+    # Le serveur fixe l'heure limite de réponse : le téléphone n'a qu'à afficher le compte à rebours
+    fin_reponse = None
+    if mission.statut == StatutMission.PROPOSE:
+        proposee_a = date_proposition(db, mission.id)
+        fin_reponse = proposee_a + DELAI_REPONSE if proposee_a else None
     return MissionOut(
         id=mission.id,
         statut=mission.statut,
@@ -58,6 +64,7 @@ def vers_mission_out(db: Session, mission: Mission) -> MissionOut:
         itineraire=itineraire,
         itineraire_noms=noms,
         duree_estimee=mission.duree_estimee,
+        fin_reponse=fin_reponse,
     )
 
 

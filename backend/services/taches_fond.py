@@ -1,13 +1,14 @@
 # services/taches_fond.py
 # Tâches exécutées régulièrement par le serveur, sans attendre qu'un utilisateur fasse une requête.
-# Exemple : un agent en pause qui a fermé son application doit quand même être remis disponible.
+# Exemples : une proposition restée sans réponse 30 s est réaffectée ; un agent en pause qui a fermé
+# son application est quand même remis disponible à la fin de sa pause.
 
 import asyncio
 import logging
 import os
 
 from database import SessionLocal
-from services.assignation_service import gerer_reprise_service_auto
+from services.assignation_service import gerer_propositions_expirees, gerer_reprise_service_auto
 
 journal = logging.getLogger("smart_brancard.taches_fond")
 
@@ -19,6 +20,9 @@ def executer_taches_periodiques() -> None:
     """Un passage de toutes les tâches périodiques, chacune avec sa propre session"""
     db = SessionLocal()
     try:
+        expirees = gerer_propositions_expirees(db)
+        if expirees:
+            journal.info("%s proposition(s) sans réponse après 30 s, réaffectée(s)", expirees)
         repris = gerer_reprise_service_auto(db)
         if repris:
             journal.info("%s agent(s) remis disponible(s) en fin de pause", repris)
