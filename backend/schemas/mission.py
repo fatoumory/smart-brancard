@@ -28,6 +28,11 @@ class MissionCreate(BaseModel):
             raise ValueError("Le départ et l'arrivée doivent être différents")
         return self
 
+class RefusMission(BaseModel):
+    """Corps de PUT /missions/{id}/refuse : le motif est obligatoire (CDC §7.3)"""
+    motif: MotifRefus
+
+
 class HistoriqueOut(BaseModel):
     """Une ligne du journal d'audit d'une mission"""
     id: int

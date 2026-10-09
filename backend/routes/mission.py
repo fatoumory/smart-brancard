@@ -9,11 +9,12 @@ from models.enums import NiveauUrgence, Role, StatutMission, TypeNoeud
 from models.mission import Mission
 from models.noeud_hopital import NoeudHopital
 from models.patient import Patient
-from models.utilisateur import Utilisateur
-from schemas.mission import MissionCreate, MissionOut, HistoriqueOut
+from models.utilisateur import Brancardier, Utilisateur
+from schemas.mission import MissionCreate, MissionOut, HistoriqueOut, RefusMission
 from services.auth_service import require_role
 from services.graphe_service import ItineraireIntrouvable, calculer_itineraire, noms_des_noeuds
-from services.assignation_service import traiter_file_attente
+from services.assignation_service import (MissionNonProposee, ReponseImpossible, accepter_mission,
+                                         refuser_mission, traiter_file_attente)
 from services.historique_service import changer_statut, historique_de
 
 # Préfixe commun à toutes les routes de ce fichier: /missions/...
@@ -161,6 +162,21 @@ def lire_historique(
     ) for l in lignes]
 
 
+#  Mission en cours du brancardier connecté (application mobile)
+# Celle qui lui est proposée, qu'il a acceptée, ou qu'il transporte ; null s'il n'en a pas.
+# Déclarée avant /{mission_id}, sinon "moi" serait pris pour un identifiant.
+@router.get("/moi", response_model=MissionOut | None)
+def ma_mission(
+    db: Session = Depends(get_db),
+    current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
+):
+    mission = db.query(Mission).filter(
+        Mission.brancardier_id == current_user.id,
+        Mission.statut.in_([StatutMission.PROPOSE, StatutMission.ACCEPTE, StatutMission.EN_TRANSIT]),
+    ).first()
+    return vers_mission_out(db, mission) if mission else None
+
+
 # Ordre de priorité : URGENT d'abord (un tri alphabétique donnerait BASSE, HAUTE, MOYENNE, URGENT)
 ORDRE_URGENCE = case(
     {NiveauUrgence.URGENT: 0, NiveauUrgence.HAUTE: 1,
@@ -201,3 +217,45 @@ def lire_mission(
     current_user: Utilisateur = Depends(require_role([Role.REGULATEUR, Role.MEDECIN]))
 ):
     return vers_mission_out(db, mission_visible(db, mission_id, current_user))
+
+
+#  Réponse du brancardier à une proposition (CDC §5.3)
+
+def erreur_reponse(e: Exception) -> HTTPException:
+    if isinstance(e, MissionNonProposee):
+        # 404 et non 403 : on ne révèle pas les missions des autres agents
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                             detail="Aucune mission de ce numéro ne vous est proposée")
+    return HTTPException(status_code=status.HTTP_409_CONFLICT,
+                         detail="Cette mission n'attend plus de réponse")
+
+
+# Acceptation : la mission passe ACCEPTE, l'agent rejoint le patient
+@router.put("/{mission_id}/accept", response_model=MissionOut)
+def accepter(
+    mission_id: int,
+    db: Session = Depends(get_db),
+    current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
+):
+    try:
+        mission = accepter_mission(db, mission_id, current_user)
+    except (MissionNonProposee, ReponseImpossible) as e:
+        db.rollback()
+        raise erreur_reponse(e) from None
+    return vers_mission_out(db, mission)
+
+
+# Refus avec motif : la mission repart vers un autre agent ; selon le motif, l'agent devient indisponible
+@router.put("/{mission_id}/refuse", response_model=MissionOut)
+def refuser(
+    mission_id: int,
+    donnees: RefusMission,
+    db: Session = Depends(get_db),
+    current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
+):
+    try:
+        mission = refuser_mission(db, mission_id, current_user, donnees.motif)
+    except (MissionNonProposee, ReponseImpossible) as e:
+        db.rollback()
+        raise erreur_reponse(e) from None
+    return vers_mission_out(db, mission)

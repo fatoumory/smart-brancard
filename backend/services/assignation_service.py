@@ -11,14 +11,14 @@
 # pendant le choix, et un index unique interdit à un agent d'avoir deux missions actives.
 
 import math
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 import networkx as nx
 from sqlalchemy import case
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from models.enums import NiveauUrgence, StatutAgent, StatutMission
+from models.enums import MotifRefus, NiveauUrgence, StatutAgent, StatutMission
 from models.historique import Historique
 from models.mission import Mission
 from models.utilisateur import Brancardier
@@ -145,3 +145,90 @@ def traiter_file_attente(db: Session) -> int:
                   .first()):
             break  # plus aucun agent libre : inutile de parcourir le reste de la file
     return proposees
+
+
+#  Réponse du brancardier à une proposition
+
+class MissionNonProposee(Exception):
+    """La mission n'est pas proposée à cet agent (autre agent, ou mission inexistante)"""
+
+
+class ReponseImpossible(Exception):
+    """La mission n'attend plus de réponse (déjà acceptée, annulée, réaffectée...)"""
+
+
+
+
+def mission_proposee_a(db: Session, mission_id: int, agent: Brancardier) -> Mission:
+    """Verrouille la mission et vérifie qu'elle est proposée à cet agent et attend sa réponse"""
+    mission = db.query(Mission).filter(Mission.id == mission_id).with_for_update().one_or_none()
+    if mission is None or mission.brancardier_id != agent.id:
+        raise MissionNonProposee()
+    if mission.statut != StatutMission.PROPOSE:
+        raise ReponseImpossible()
+    return mission
+
+
+def accepter_mission(db: Session, mission_id: int, agent: Brancardier) -> Mission:
+    """L'agent accepte : la mission passe ACCEPTE (il rejoint le patient), l'agent reste EN_MISSION.
+    L'acceptation est une décision explicite de l'agent, tracée dans le journal (CDC §7.3)."""
+    mission = mission_proposee_a(db, mission_id, agent)
+    changer_statut(db, mission, StatutMission.ACCEPTE, auteur_id=agent.id)
+    db.commit()
+    return mission
+
+
+def refuser_mission(db: Session, mission_id: int, agent: Brancardier, motif: MotifRefus) -> Mission:
+    """L'agent refuse avec un motif : la mission retourne en attente et sera proposée à un autre agent.
+    Le refus est tracé avec son motif ; il exclut l'agent des prochaines propositions de cette mission."""
+    mission = mission_proposee_a(db, mission_id, agent)
+    mission.brancardier_id = None
+    changer_statut(db, mission, StatutMission.EN_ATTENTE, auteur_id=agent.id, motif_refus=motif)
+    if motif == MotifRefus.URGENCE_PRIORITAIRE:
+        # Retenu par une autre urgence : il se met en pause, et revient quand il a fini
+        mettre_en_pause(agent)
+    else:
+        # Matériel défectueux, état physique, fin de service : il ne peut plus transporter
+        agent.statut = StatutAgent.INDISPONIBLE
+        agent.fin_pause = None
+    db.commit()
+
+    # Réaffectation immédiate à l'agent suivant (et, s'il redevient disponible, à cet agent une autre mission)
+    traiter_file_attente(db)
+    db.refresh(mission)
+    return mission
+
+
+#  Pauses (diagramme : changer_statut, gerer_reprise_service_auto)
+
+DUREE_PAUSE_DEFAUT_MIN = 15
+
+
+def maintenant() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def mettre_en_pause(agent: Brancardier, minutes: int | None = None) -> None:
+    """Met l'agent en pause pour une durée donnée ; le serveur le remettra disponible à la fin"""
+    agent.statut = StatutAgent.EN_PAUSE
+    agent.fin_pause = maintenant() + timedelta(minutes=minutes or DUREE_PAUSE_DEFAUT_MIN)
+
+
+def gerer_reprise_service_auto(db: Session) -> int:
+    """Remet DISPONIBLES les agents dont la pause est terminée, puis leur propose la file d'attente.
+    Appelé régulièrement par la tâche de fond (services/taches_fond.py).
+    Renvoie le nombre d'agents remis en service."""
+    agents = (db.query(Brancardier)
+              .filter(Brancardier.statut == StatutAgent.EN_PAUSE,
+                      Brancardier.fin_pause.is_not(None),
+                      Brancardier.fin_pause <= maintenant())
+              .with_for_update(skip_locked=True, of=Brancardier)
+              .all())
+    for agent in agents:
+        agent.statut = StatutAgent.DISPONIBLE
+        agent.fin_pause = None
+    db.commit()
+
+    if agents:
+        traiter_file_attente(db)
+    return len(agents)

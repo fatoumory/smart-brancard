@@ -9,7 +9,7 @@ from models.mission import Mission
 from models.noeud_hopital import NoeudHopital
 from models.utilisateur import Brancardier, Utilisateur
 from schemas.utilisateur import StatutUpdate, UtilisateurOut
-from services.assignation_service import traiter_file_attente
+from services.assignation_service import mettre_en_pause, traiter_file_attente
 from services.auth_service import require_role
 from services.position_service import positions_actuelles
 
@@ -72,7 +72,12 @@ def changer_mon_statut(
             detail="Vous avez une mission en cours : terminez-la ou refusez-la d'abord"
         )
 
-    current_user.statut = donnees.statut
+    if donnees.statut == StatutAgent.EN_PAUSE:
+        # La fin de la pause est gérée par le serveur, pas par le téléphone
+        mettre_en_pause(current_user, donnees.duree_pause_minutes)
+    else:
+        current_user.statut = donnees.statut
+        current_user.fin_pause = None
     db.commit()
 
     # Un agent qui redevient disponible reçoit la première mission de la file d'attente

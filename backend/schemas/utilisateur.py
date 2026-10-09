@@ -49,11 +49,15 @@ class UtilisateurOut(BaseModel):
     position_noeud_id: int | None = None
     position_noeud_nom: str | None = None
     position_date: datetime | None = None
+    # Fin prévue de la pause en cours (le téléphone affiche le compte à rebours à partir de cette heure)
+    fin_pause: datetime | None = None
 
 
 class StatutUpdate(BaseModel):
     """Changement de statut opérationnel d'un brancardier"""
     statut: StatutAgent
+    # Durée de la pause en minutes (seulement pour EN_PAUSE ; 15 min si non précisée)
+    duree_pause_minutes: int | None = Field(default=None, ge=1, le=60)
 
 
 class Token(BaseModel):

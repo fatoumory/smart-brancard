@@ -1,6 +1,8 @@
 # main.py
 
+import asyncio
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,13 +18,24 @@ from routes.mission import router as missions_router
 from routes.patient import router as patients_router
 from routes.graphe import router_noeuds as noeuds_router  
 from routes.detection import router as detections_router
+from services.taches_fond import INTERVALLE_S, boucle_taches_fond
+
+
+#  Tâches de fond : démarrées avec l'API, arrêtées avec elle
+@asynccontextmanager
+async def cycle_de_vie(_: FastAPI):
+    tache = asyncio.create_task(boucle_taches_fond()) if INTERVALLE_S > 0 else None
+    yield
+    if tache is not None:
+        tache.cancel()
 
 
 #  Création de l'application FastAPI 
 app = FastAPI(
     title="Smart-Brancard API",
     description="API de gestion des flux de brancardage dans les hôpitaux",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=cycle_de_vie,
 )
 
 #  CORS 
