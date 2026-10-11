@@ -10,9 +10,9 @@ import { formaterHeure } from "../services/referentiel";
 // Les 4 étapes vues par le médecin (maquette "Suivi de la demande").
 // Chaque étape est atteinte avec un statut de mission ; son heure vient du journal d'audit.
 const ETAPES = [
-    { libelle: "Demande reçue par la régulation", statuts: ["EN_ATTENTE", "PROPOSE", "EN_TRANSIT", "TERMINE"] },
-    { libelle: "Assignée à un brancardier", statuts: ["PROPOSE", "EN_TRANSIT", "TERMINE"] },
-    { libelle: "Prise en charge acceptée", statuts: ["EN_TRANSIT", "TERMINE"] },
+    { libelle: "Demande reçue par la régulation", statuts: ["EN_ATTENTE", "PROPOSE", "ACCEPTE", "EN_TRANSIT", "TERMINE"] },
+    { libelle: "Assignée à un brancardier", statuts: ["PROPOSE", "ACCEPTE", "EN_TRANSIT", "TERMINE"] },
+    { libelle: "Prise en charge acceptée", statuts: ["ACCEPTE", "EN_TRANSIT", "TERMINE"] },
     { libelle: "Patient transféré", statuts: ["TERMINE"] },
 ];
 
@@ -20,6 +20,7 @@ const ETAPES = [
 const SITUATIONS = {
     EN_ATTENTE: ["En attente d'assignation", "Le régulateur va choisir le brancardier disponible le plus proche."],
     PROPOSE: ["Proposée à un brancardier", "En attente de sa réponse."],
+    ACCEPTE: ["Brancardier en route", "Le brancardier a accepté et rejoint le patient."],
     EN_TRANSIT: ["Patient en cours de transport", "Le brancardier a pris en charge le patient."],
     TERMINE: ["Transfert terminé", "Le patient est arrivé à destination."],
     ANNULE: ["Mission annulée", "Cette demande a été annulée par la régulation."],

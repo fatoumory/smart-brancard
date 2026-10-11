@@ -2,6 +2,8 @@
 # Schémas Pydantic: valident les données entrantes (JSON) et
 # contrôlent ce qui est renvoyé au frontend (jamais le hash du mot de passe)
 
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from models.enums import Role, StatutAgent
@@ -43,11 +45,19 @@ class UtilisateurOut(BaseModel):
     # Renseignés uniquement pour un brancardier
     statut: StatutAgent | None = None
     compteur_mission: int | None = None
+    # Position actuelle d'un brancardier : sa dernière détection de balise (vide si jamais détecté)
+    position_noeud_id: int | None = None
+    position_noeud_nom: str | None = None
+    position_date: datetime | None = None
+    # Fin prévue de la pause en cours (le téléphone affiche le compte à rebours à partir de cette heure)
+    fin_pause: datetime | None = None
 
 
 class StatutUpdate(BaseModel):
     """Changement de statut opérationnel d'un brancardier"""
     statut: StatutAgent
+    # Durée de la pause en minutes (seulement pour EN_PAUSE ; 15 min si non précisée)
+    duree_pause_minutes: int | None = Field(default=None, ge=1, le=60)
 
 
 class Token(BaseModel):
