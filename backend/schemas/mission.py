@@ -46,6 +46,11 @@ class ScanArrivee(BaseModel):
     tag_nfc: str = Field(min_length=1, max_length=100)
 
 
+class Reaffectation(BaseModel):
+    """Corps de PUT /missions/{id}/reaffecter : le brancardier choisi par le régulateur"""
+    brancardier_id: int
+
+
 class HistoriqueOut(BaseModel):
     """Une ligne du journal d'audit d'une mission"""
     id: int
@@ -74,6 +79,17 @@ class MissionOut(BaseModel):
 
     prescripteur_id: int
     brancardier_id: int | None
+    # Agent de la mission : identité et dernière position connue (balise)
+    brancardier_nom: str | None = None
+    brancardier_prenom: str | None = None
+    brancardier_position_id: int | None = None
+    brancardier_position_nom: str | None = None
+    # True : agent choisi par l'algorithme (badge « Auto ») ; False : choisi par le régulateur
+    assignation_auto: bool | None = None
+    # Agent en approche (PROPOSE ou ACCEPTE) : temps de trajet jusqu'au point de départ, en minutes,
+    # et heure d'arrivée estimée (maquette du suivi médecin : « Arrivée estimée au point de départ »)
+    temps_agent_min: float | None = None
+    arrivee_estimee: datetime | None = None
 
     noeud_source_id: int
     noeud_source_nom: str
@@ -87,4 +103,13 @@ class MissionOut(BaseModel):
     duree_estimee: float | None
     # Mission PROPOSE : heure limite de réponse de l'agent (compte à rebours du téléphone)
     fin_reponse: datetime | None = None
+
+    # Délai garanti de prise en charge (3, 8, 15 ou 30 min selon l'urgence) et heure limite
+    delai_garanti_min: int
+    limite_prise_en_charge: datetime
+    # Horodatages lus dans le journal : prise en charge (scan de départ) et clôture (fin ou annulation)
+    date_prise_en_charge: datetime | None = None
+    date_fin: datetime | None = None
+    # Délai respecté ? Connu à la prise en charge (ou False dès qu'il est dépassé) ; vide sinon
+    dans_les_delais: bool | None = None
 

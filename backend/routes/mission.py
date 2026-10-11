@@ -10,15 +10,17 @@ from models.mission import Mission
 from models.noeud_hopital import NoeudHopital
 from models.patient import Patient
 from models.utilisateur import Brancardier, Utilisateur
-from schemas.mission import (HistoriqueOut, MissionCreate, MissionOut, RefusMission, ScanArrivee,
-                             ScanDepart)
+from schemas.mission import (HistoriqueOut, MissionCreate, MissionOut, Reaffectation, RefusMission,
+                             ScanArrivee, ScanDepart)
 from services.auth_service import require_role
-from services.graphe_service import ItineraireIntrouvable, calculer_itineraire, noms_des_noeuds
-from services.assignation_service import (DELAI_REPONSE, MissionNonProposee, ReponseImpossible,
-                                         accepter_mission, date_proposition,
+from services.graphe_service import ItineraireIntrouvable, calculer_itineraire
+from services.assignation_service import (MissionNonProposee, ReponseImpossible, accepter_mission,
                                          refuser_mission, traiter_file_attente)
 from services.historique_service import changer_statut, historique_de
+from services.regulation_service import (ActionImpossible, MissionIntrouvable, annuler_mission,
+                                        reaffecter_manuellement)
 from services.scan_service import ScanInvalide, scanner_arrivee, scanner_depart
+from services.vue_mission_service import construire_missions_out
 
 # Préfixe commun à toutes les routes de ce fichier: /missions/...
 router = APIRouter(prefix="/missions", tags=["Missions"])
@@ -36,38 +38,8 @@ def service_existant(db: Session, noeud_id: int, role_du_noeud: str) -> NoeudHop
 
 
 def vers_mission_out(db: Session, mission: Mission) -> MissionOut:
-    """Complète la mission avec le patient et les noms des nœuds pour le frontend"""
-    patient = db.get(Patient, mission.patient_id)
-    itineraire = json.loads(mission.itineraire)
-    noms = noms_des_noeuds(db, itineraire)
-    # Le serveur fixe l'heure limite de réponse : le téléphone n'a qu'à afficher le compte à rebours
-    fin_reponse = None
-    if mission.statut == StatutMission.PROPOSE:
-        proposee_a = date_proposition(db, mission.id)
-        fin_reponse = proposee_a + DELAI_REPONSE if proposee_a else None
-    return MissionOut(
-        id=mission.id,
-        statut=mission.statut,
-        niveau_urgence=mission.niveau_urgence,
-        materiel_requis=mission.materiel_requis,
-        materiel_deja_dispo=mission.materiel_deja_dispo,
-        consigne=mission.consigne,
-        date_creation=mission.date_creation,
-        patient_id=patient.id,
-        patient_ipp=patient.id_hospitalisation,
-        patient_nom=patient.nom,
-        patient_prenom=patient.prenom,
-        prescripteur_id=mission.prescripteur_id,
-        brancardier_id=mission.brancardier_id,
-        noeud_source_id=mission.noeud_source_id,
-        noeud_source_nom=noms[0],
-        noeud_destination_id=mission.noeud_destination_id,
-        noeud_destination_nom=noms[-1],
-        itineraire=itineraire,
-        itineraire_noms=noms,
-        duree_estimee=mission.duree_estimee,
-        fin_reponse=fin_reponse,
-    )
+    """Une mission complétée pour le frontend (voir services/vue_mission_service.py)"""
+    return construire_missions_out(db, [mission])[0]
 
 
 # Création d'une mission (prescripteur uniquement : médecin ou infirmier)
@@ -215,7 +187,7 @@ def lister_missions(
 
     # Les plus urgentes d'abord ; à urgence égale, la plus ancienne d'abord (file d'attente)
     missions = requete.order_by(ORDRE_URGENCE, Mission.date_creation, Mission.id).limit(limite).all()
-    return [vers_mission_out(db, m) for m in missions]
+    return construire_missions_out(db, missions)
 
 
 #  Détail d'une mission (suivi de la demande)
@@ -313,4 +285,43 @@ def scan_arrivee(
     except (MissionNonProposee, ReponseImpossible, ScanInvalide) as e:
         db.rollback()
         raise erreur_scan(e, "arrivée") from None
+    return vers_mission_out(db, mission)
+
+
+#  Actions d'exception du régulateur (maquette : menu « ⋯ » de la file des missions)
+
+def erreur_regulation(e: Exception) -> HTTPException:
+    if isinstance(e, MissionIntrouvable):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mission introuvable")
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
+
+# Réaffectation manuelle : la mission est proposée au brancardier choisi
+@router.put("/{mission_id}/reaffecter", response_model=MissionOut)
+def reaffecter(
+    mission_id: int,
+    donnees: Reaffectation,
+    db: Session = Depends(get_db),
+    current_user: Utilisateur = Depends(require_role([Role.REGULATEUR]))
+):
+    try:
+        mission = reaffecter_manuellement(db, mission_id, donnees.brancardier_id, current_user)
+    except (MissionIntrouvable, ActionImpossible) as e:
+        db.rollback()
+        raise erreur_regulation(e) from None
+    return vers_mission_out(db, mission)
+
+
+# Annulation : la mission passe ANNULE, l'agent sollicité est libéré
+@router.put("/{mission_id}/annuler", response_model=MissionOut)
+def annuler(
+    mission_id: int,
+    db: Session = Depends(get_db),
+    current_user: Utilisateur = Depends(require_role([Role.REGULATEUR]))
+):
+    try:
+        mission = annuler_mission(db, mission_id, current_user)
+    except (MissionIntrouvable, ActionImpossible) as e:
+        db.rollback()
+        raise erreur_regulation(e) from None
     return vers_mission_out(db, mission)

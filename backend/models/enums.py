@@ -36,6 +36,16 @@ class NiveauUrgence(str, Enum):
     URGENT = "URGENT"
 
 
+# Délai garanti de prise en charge selon l'urgence, en minutes (feuille de route, Sprint 5 ;
+# maquette : « Délai SLA garanti »). Même valeurs que frontend/src/services/referentiel.js
+DELAI_GARANTI_MIN = {
+    NiveauUrgence.URGENT: 3,
+    NiveauUrgence.HAUTE: 8,
+    NiveauUrgence.MOYENNE: 15,
+    NiveauUrgence.BASSE: 30,
+}
+
+
 class Materiel(str, Enum):
     RIEN = "RIEN"
     CHAISE_ROULANTE = "CHAISE_ROULANTE"
