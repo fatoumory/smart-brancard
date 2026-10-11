@@ -54,8 +54,9 @@ function Regulateur() {
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <CarteIndicateur titre="Missions actives" valeur={compter("EN_TRANSIT")}
-                        detail="En transit actuellement" icone={Navigation} couleur="bleu" />
+                    {/* Active = un brancardier s'en occupe : il a accepté (en route) ou transporte le patient */}
+                    <CarteIndicateur titre="Missions actives" valeur={compter("ACCEPTE") + compter("EN_TRANSIT")}
+                        detail="Acceptées ou en transit" icone={Navigation} couleur="bleu" />
                     <CarteIndicateur titre="En attente" valeur={compter("EN_ATTENTE")}
                         detail="File prioritaire" icone={Clock} couleur="orange" />
                     <CarteIndicateur titre="Agents disponibles" valeur={disponibles}
