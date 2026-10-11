@@ -1,4 +1,4 @@
-import { CircleCheck, Clock, Navigation, RefreshCw, Users } from "lucide-react";
+import { CircleCheck, Clock, Footprints, Navigation, RefreshCw, Users } from "lucide-react";
 import EnTete from "../components/EnTete";
 import CarteIndicateur from "../components/dashboard/CarteIndicateur";
 import FileMissions from "../components/dashboard/FileMissions";
@@ -53,16 +53,21 @@ function Regulateur() {
                     <p className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl">{missions.erreur}</p>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Active = un brancardier s'en occupe : il a accepté (en route) ou transporte le patient */}
-                    <CarteIndicateur titre="Missions actives" valeur={compter("ACCEPTE") + compter("EN_TRANSIT")}
-                        detail="Acceptées ou en transit" icone={Navigation} couleur="bleu" />
+                {/* Indicateurs, dans l'ordre du trajet d'une mission : attente → en route → en transit */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    {/* Missions qui attendent encore un brancardier */}
                     <CarteIndicateur titre="En attente" valeur={compter("EN_ATTENTE")}
                         detail="File prioritaire" icone={Clock} couleur="orange" />
-                    <CarteIndicateur titre="Agents disponibles" valeur={disponibles}
-                        detail={`sur ${agents.donnees?.length ?? 0} agents`} icone={Users} couleur="vert" />
-                    <CarteIndicateur titre="Terminées aujourd'hui" valeur={terminees}
-                        detail="Depuis minuit" icone={CircleCheck} couleur="vert" />
+                    {/* Brancardier qui a accepté et marche vers le patient */}
+                    <CarteIndicateur titre="En route" valeur={compter("ACCEPTE")}
+                        detail="Vers le patient" icone={Footprints} couleur="indigo" />
+                    {/* Patient pris en charge, en cours de transport */}
+                    <CarteIndicateur titre="En transit" valeur={compter("EN_TRANSIT")}
+                        detail="Patient transporté" icone={Navigation} couleur="bleu" />
+                    <CarteIndicateur titre="Disponibles" valeur={disponibles}
+                        detail={`agents sur ${agents.donnees?.length ?? 0}`} icone={Users} couleur="vert" />
+                    <CarteIndicateur titre="Terminées" valeur={terminees}
+                        detail="Aujourd'hui, depuis minuit" icone={CircleCheck} couleur="vert" />
                 </div>
 
                 {missions.donnees && <FileMissions missions={liste} agentsParId={agentsParId} typesNoeuds={typesNoeuds} />}
