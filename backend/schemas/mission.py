@@ -33,6 +33,19 @@ class RefusMission(BaseModel):
     motif: MotifRefus
 
 
+class ScanDepart(BaseModel):
+    """Corps de POST /missions/{id}/scan-depart : tag NFC de la salle puis QR du bracelet.
+    forcer_urgence=true : prise en charge sans scan, réservée aux missions URGENT (tracée)."""
+    tag_nfc: str | None = Field(default=None, max_length=100)
+    code_bracelet: str | None = Field(default=None, max_length=100)
+    forcer_urgence: bool = False
+
+
+class ScanArrivee(BaseModel):
+    """Corps de POST /missions/{id}/scan-arrivee : tag NFC de la salle de destination"""
+    tag_nfc: str = Field(min_length=1, max_length=100)
+
+
 class HistoriqueOut(BaseModel):
     """Une ligne du journal d'audit d'une mission"""
     id: int

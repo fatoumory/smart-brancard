@@ -10,13 +10,15 @@ from models.mission import Mission
 from models.noeud_hopital import NoeudHopital
 from models.patient import Patient
 from models.utilisateur import Brancardier, Utilisateur
-from schemas.mission import MissionCreate, MissionOut, HistoriqueOut, RefusMission
+from schemas.mission import (HistoriqueOut, MissionCreate, MissionOut, RefusMission, ScanArrivee,
+                             ScanDepart)
 from services.auth_service import require_role
 from services.graphe_service import ItineraireIntrouvable, calculer_itineraire, noms_des_noeuds
 from services.assignation_service import (DELAI_REPONSE, MissionNonProposee, ReponseImpossible,
                                          accepter_mission, date_proposition,
                                          refuser_mission, traiter_file_attente)
 from services.historique_service import changer_statut, historique_de
+from services.scan_service import ScanInvalide, scanner_arrivee, scanner_depart
 
 # Préfixe commun à toutes les routes de ce fichier: /missions/...
 router = APIRouter(prefix="/missions", tags=["Missions"])
@@ -265,4 +267,50 @@ def refuser(
     except (MissionNonProposee, ReponseImpossible) as e:
         db.rollback()
         raise erreur_reponse(e) from None
+    return vers_mission_out(db, mission)
+
+
+#  Scans de traçabilité (CDC §5.5)
+
+def erreur_scan(e: Exception, etape: str) -> HTTPException:
+    if isinstance(e, MissionNonProposee):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                             detail="Cette mission ne vous est pas attribuée")
+    if isinstance(e, ReponseImpossible):
+        return HTTPException(status_code=status.HTTP_409_CONFLICT,
+                             detail=f"La mission n'en est pas à l'étape « {etape} »")
+    # ScanInvalide : le message explique à l'agent ce qui ne correspond pas
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e))
+
+
+# Prise en charge : tag NFC de la salle de départ + QR du bracelet -> EN_TRANSIT
+@router.post("/{mission_id}/scan-depart", response_model=MissionOut)
+def scan_depart(
+    mission_id: int,
+    donnees: ScanDepart,
+    db: Session = Depends(get_db),
+    current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
+):
+    try:
+        mission = scanner_depart(db, mission_id, current_user, donnees.tag_nfc,
+                                 donnees.code_bracelet, donnees.forcer_urgence)
+    except (MissionNonProposee, ReponseImpossible, ScanInvalide) as e:
+        db.rollback()
+        raise erreur_scan(e, "prise en charge") from None
+    return vers_mission_out(db, mission)
+
+
+# Clôture : tag NFC de la salle de destination -> TERMINE, l'agent est libéré
+@router.post("/{mission_id}/scan-arrivee", response_model=MissionOut)
+def scan_arrivee(
+    mission_id: int,
+    donnees: ScanArrivee,
+    db: Session = Depends(get_db),
+    current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
+):
+    try:
+        mission = scanner_arrivee(db, mission_id, current_user, donnees.tag_nfc)
+    except (MissionNonProposee, ReponseImpossible, ScanInvalide) as e:
+        db.rollback()
+        raise erreur_scan(e, "arrivée") from None
     return vers_mission_out(db, mission)
