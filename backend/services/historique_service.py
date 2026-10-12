@@ -16,9 +16,11 @@ def changer_statut(
     auteur_id: int | None,
     methode: MethodeVerification = MethodeVerification.MANUEL,
     motif_refus: MotifRefus | None = None,
+    agent_id: int | None = None,
 ) -> Historique:
     """Change le statut de la mission et ajoute la ligne d'historique correspondante.
     auteur_id=None signifie que c'est l'algorithme qui agit (ex : assignation automatique).
+    agent_id : le brancardier concerné par ce changement (proposé, qui accepte, refuse, scanne...).
     Ne fait pas de commit : l'appelant enregistre la mission et l'historique ensemble."""
     # Un refus renvoie la mission en attente : c'est le seul cas où un motif a du sens
     if motif_refus is not None and nouveau_statut != StatutMission.EN_ATTENTE:
@@ -28,6 +30,7 @@ def changer_statut(
     ligne = Historique(
         mission_id=mission.id,
         auteur_id=auteur_id,
+        brancardier_id=agent_id,
         statut_modifie_en=nouveau_statut,
         methode_verification=methode,
         motif_refus=motif_refus,

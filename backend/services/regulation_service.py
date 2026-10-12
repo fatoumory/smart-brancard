@@ -63,7 +63,7 @@ def reaffecter_manuellement(db: Session, mission_id: int, brancardier_id: int,
     liberer_agent(db, mission)
     mission.brancardier_id = agent.id
     agent.statut = StatutAgent.EN_MISSION
-    changer_statut(db, mission, StatutMission.PROPOSE, auteur_id=regulateur.id)
+    changer_statut(db, mission, StatutMission.PROPOSE, auteur_id=regulateur.id, agent_id=agent.id)
     try:
         db.commit()
     except IntegrityError:
@@ -81,8 +81,9 @@ def annuler_mission(db: Session, mission_id: int, regulateur: Utilisateur) -> Mi
     """La mission est annulée (ANNULE) ; l'agent éventuellement sollicité est libéré.
     Une mission n'est jamais supprimée : elle reste dans le journal d'audit (CDC §7.3)."""
     mission = mission_modifiable(db, mission_id)
+    agent_id = mission.brancardier_id
     liberer_agent(db, mission)
-    changer_statut(db, mission, StatutMission.ANNULE, auteur_id=regulateur.id)
+    changer_statut(db, mission, StatutMission.ANNULE, auteur_id=regulateur.id, agent_id=agent_id)
     db.commit()
 
     traiter_file_attente(db)

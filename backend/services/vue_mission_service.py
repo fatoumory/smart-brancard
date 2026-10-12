@@ -12,26 +12,19 @@ from datetime import datetime, timedelta, timezone
 import networkx as nx
 from sqlalchemy.orm import Session
 
-from models.enums import DELAI_GARANTI_MIN, StatutMission
+from models.enums import DELAI_GARANTI_MIN, MotifRefus, StatutMission
 from models.historique import Historique
 from models.mission import Mission
 from models.noeud_hopital import NoeudHopital
 from models.patient import Patient
 from models.utilisateur import Brancardier
 from schemas.mission import MissionOut
-from services.assignation_service import DELAI_REPONSE
+from services.assignation_service import DELAIS_REPONSE
 from services.graphe_service import construire_graphe
-from services.position_service import positions_actuelles
+from services.position_service import en_utc, positions_actuelles
 
 # Statuts où l'agent rejoint le patient : l'arrivée estimée au point de départ a un sens
 STATUTS_EN_APPROCHE = {StatutMission.PROPOSE, StatutMission.ACCEPTE}
-
-
-def en_utc(instant: datetime | None) -> datetime | None:
-    """SQLite (tests) renvoie des dates sans fuseau : elles sont en UTC, on le précise"""
-    if instant is not None and instant.tzinfo is None:
-        return instant.replace(tzinfo=timezone.utc)
-    return instant
 
 
 def construire_missions_out(db: Session, missions: list[Mission]) -> list[MissionOut]:
@@ -46,7 +39,8 @@ def construire_missions_out(db: Session, missions: list[Mission]) -> list[Missio
     noms_noeuds = dict(db.query(NoeudHopital.id, NoeudHopital.nom_salle).all())
     ids_agents = {m.brancardier_id for m in missions if m.brancardier_id is not None}
     agents = {a.id: a for a in db.query(Brancardier).filter(Brancardier.id.in_(ids_agents))}
-    positions = positions_actuelles(db, list(ids_agents)) if ids_agents else {}
+    # Positions de moins de 10 min seulement : une position périmée fausserait l'arrivée estimée
+    positions = positions_actuelles(db, list(ids_agents), recentes_seulement=True) if ids_agents else {}
 
     journal = defaultdict(list)
     for ligne in (db.query(Historique).filter(Historique.mission_id.in_(ids))
@@ -77,7 +71,7 @@ def construire_missions_out(db: Session, missions: list[Mission]) -> list[Missio
         derniere_proposition = propositions[-1] if propositions else None
         fin_reponse = None
         if m.statut == StatutMission.PROPOSE and derniere_proposition:
-            fin_reponse = en_utc(derniere_proposition.horodatage) + DELAI_REPONSE
+            fin_reponse = en_utc(derniere_proposition.horodatage) + DELAIS_REPONSE[m.niveau_urgence]
         assignation_auto = (derniere_proposition.auteur_id is None
                             if m.brancardier_id is not None and derniere_proposition else None)
 
@@ -94,6 +88,10 @@ def construire_missions_out(db: Session, missions: list[Mission]) -> list[Missio
             dans_les_delais = False
         else:
             dans_les_delais = None
+
+        # Refus pour matériel défectueux en dernier : la mission attend la décision du régulateur
+        alerte_materiel = (m.statut == StatutMission.EN_ATTENTE and bool(lignes)
+                           and lignes[-1].motif_refus == MotifRefus.MATERIEL_DEFECTUEUX)
 
         # Agent : identité, position, et arrivée estimée au point de départ s'il est en approche
         agent = agents.get(m.brancardier_id)
@@ -138,5 +136,6 @@ def construire_missions_out(db: Session, missions: list[Mission]) -> list[Missio
             date_prise_en_charge=prise,
             date_fin=fin,
             dans_les_delais=dans_les_delais,
+            alerte_materiel=alerte_materiel,
         ))
     return resultat

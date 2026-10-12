@@ -11,7 +11,7 @@ from models.utilisateur import Brancardier, Utilisateur
 from schemas.utilisateur import StatutUpdate, UtilisateurOut
 from services.assignation_service import mettre_en_pause, traiter_file_attente
 from services.auth_service import require_role
-from services.position_service import positions_actuelles
+from services.position_service import est_recente, positions_actuelles
 
 # Préfixe commun à toutes les routes de ce fichier: /utilisateurs/...
 router = APIRouter(prefix="/utilisateurs", tags=["Utilisateurs"])
@@ -43,6 +43,7 @@ def lister_utilisateurs(
             sortie.position_noeud_id = detection.noeud_id
             sortie.position_noeud_nom = noms[detection.noeud_id]
             sortie.position_date = detection.date_heure
+            sortie.position_recente = est_recente(detection)
         resultat.append(sortie)
     return resultat
 
@@ -78,6 +79,9 @@ def changer_mon_statut(
     else:
         current_user.statut = donnees.statut
         current_user.fin_pause = None
+    if donnees.statut == StatutAgent.DISPONIBLE:
+        # Il se signale lui-même : ses non-réponses passées ne comptent plus
+        current_user.non_reponses = 0
     db.commit()
 
     # Un agent qui redevient disponible reçoit la première mission de la file d'attente

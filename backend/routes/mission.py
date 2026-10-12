@@ -1,4 +1,5 @@
 import json
+from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import case
@@ -6,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models.enums import NiveauUrgence, Role, StatutMission, TypeNoeud
+from models.historique import Historique
 from models.mission import Mission
 from models.noeud_hopital import NoeudHopital
 from models.patient import Patient
@@ -138,6 +140,7 @@ def lire_historique(
         horodatage=l.horodatage,
         auteur_id=l.auteur_id,
         auteur_nom=auteurs.get(l.auteur_id),
+        brancardier_id=l.brancardier_id,
         methode_verification=l.methode_verification,
         motif_refus=l.motif_refus,
     ) for l in lignes]
@@ -156,6 +159,29 @@ def ma_mission(
         Mission.statut.in_([StatutMission.PROPOSE, StatutMission.ACCEPTE, StatutMission.EN_TRANSIT]),
     ).first()
     return vers_mission_out(db, mission) if mission else None
+
+
+#  Journal du brancardier (onglet « Journal » de l'application mobile)
+# Missions qu'il a terminées dans la journée, de la plus récente à la plus ancienne.
+# Exemple : GET /missions/moi/journal  ou  GET /missions/moi/journal?jour=2026-10-12
+# La journée va de minuit à minuit en UTC (heure de Dakar).
+@router.get("/moi/journal", response_model=list[MissionOut])
+def mon_journal(
+    jour: date | None = None,
+    db: Session = Depends(get_db),
+    current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
+):
+    debut = datetime.combine(jour or datetime.now(timezone.utc).date(), time.min, tzinfo=timezone.utc)
+    ids = {m_id for (m_id,) in
+           db.query(Historique.mission_id)
+           .join(Mission, Mission.id == Historique.mission_id)
+           .filter(Mission.brancardier_id == current_user.id,
+                   Mission.statut == StatutMission.TERMINE,
+                   Historique.statut_modifie_en == StatutMission.TERMINE,
+                   Historique.horodatage >= debut,
+                   Historique.horodatage < debut + timedelta(days=1))}
+    missions = construire_missions_out(db, db.query(Mission).filter(Mission.id.in_(ids)).all())
+    return sorted(missions, key=lambda m: m.date_fin, reverse=True)
 
 
 # Ordre de priorité : URGENT d'abord (un tri alphabétique donnerait BASSE, HAUTE, MOYENNE, URGENT)
