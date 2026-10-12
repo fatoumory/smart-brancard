@@ -59,6 +59,8 @@ class HistoriqueOut(BaseModel):
     # Vide (None) quand c'est l'algorithme qui a agi
     auteur_id: int | None
     auteur_nom: str | None
+    # Brancardier concerné (proposé, qui accepte, refuse, ne répond pas, scanne...)
+    brancardier_id: int | None = None
     methode_verification: MethodeVerification
     motif_refus: MotifRefus | None
 
@@ -112,4 +114,6 @@ class MissionOut(BaseModel):
     date_fin: datetime | None = None
     # Délai respecté ? Connu à la prise en charge (ou False dès qu'il est dépassé) ; vide sinon
     dans_les_delais: bool | None = None
+    # Refusée pour matériel défectueux : n'est plus proposée automatiquement, le régulateur décide
+    alerte_materiel: bool = False
 

@@ -56,4 +56,8 @@ class Brancardier(Utilisateur):
     # DISPONIBLE de lui-même, même si son téléphone est éteint (gerer_reprise_service_auto)
     fin_pause = Column(DateTime(timezone=True), nullable=True)
 
+    # Propositions laissées sans réponse d'affilée : à 2, l'agent passe INDISPONIBLE.
+    # Remis à zéro dès qu'il répond (acceptation ou refus) ou qu'il se remet disponible.
+    non_reponses = Column(Integer, nullable=False, default=0, server_default="0")
+
     __mapper_args__ = {"polymorphic_identity": "brancardier"}

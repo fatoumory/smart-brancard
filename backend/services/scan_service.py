@@ -57,7 +57,8 @@ def scanner_depart(db: Session, mission_id: int, agent: Brancardier, tag_nfc: st
         # Le bracelet est la preuve d'identité : c'est la vérification retenue dans le journal
         methode = MethodeVerification.SCAN_CODE_QR
 
-    changer_statut(db, mission, StatutMission.EN_TRANSIT, auteur_id=agent.id, methode=methode)
+    changer_statut(db, mission, StatutMission.EN_TRANSIT, auteur_id=agent.id, methode=methode,
+                   agent_id=agent.id)
     # L'agent est au point de départ : sa position est mise à jour
     enregistrer_detection(db, agent.id, mission.noeud_source_id)
     db.commit()
@@ -73,7 +74,7 @@ def scanner_arrivee(db: Session, mission_id: int, agent: Brancardier, tag_nfc: s
         raise ScanInvalide(f"Ce tag n'est pas celui de la destination ({destination.nom_salle})")
 
     changer_statut(db, mission, StatutMission.TERMINE, auteur_id=agent.id,
-                   methode=MethodeVerification.BADGE_NFC)
+                   methode=MethodeVerification.BADGE_NFC, agent_id=agent.id)
     enregistrer_detection(db, agent.id, mission.noeud_destination_id)
     # Diagramme : incrementer_compteur_mission (équité de charge pour les prochaines assignations)
     incrementer_compteur(agent)

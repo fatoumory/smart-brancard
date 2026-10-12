@@ -150,8 +150,9 @@ def test_agent_ayant_refuse_n_est_plus_sollicite(client, reg, medecin):
 
     # Refus déjà enregistré dans le journal (la route de refus arrive à la tâche 4)
     db = SessionLocal()
-    db.add(Historique(mission_id=m["id"], auteur_id=refuse, statut_modifie_en=StatutMission.EN_ATTENTE,
-                      motif_refus=MotifRefus.MATERIEL_DEFECTUEUX))
+    db.add(Historique(mission_id=m["id"], auteur_id=refuse, brancardier_id=refuse,
+                      statut_modifie_en=StatutMission.EN_ATTENTE,
+                      motif_refus=MotifRefus.INDISPONIBILITE_PHYSIQUE))
     db.commit()
     db.close()
 

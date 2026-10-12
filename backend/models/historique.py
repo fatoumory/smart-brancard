@@ -19,6 +19,11 @@ class Historique(Base):
     # Auteur de l'action : vide si c'est l'algorithme d'assignation
     auteur_id = Column(Integer, ForeignKey("utilisateurs.id"), nullable=True)
 
+    # Agent concerné : celui à qui la mission est proposée, qui accepte, refuse, ne répond pas,
+    # scanne... Vide à la création. Permet d'exclure d'une mission les agents qui l'ont refusée
+    # ou laissée sans réponse, et de retrouver toutes les propositions (CDC §7.3)
+    brancardier_id = Column(Integer, ForeignKey("brancardiers.id"), nullable=True, index=True)
+
     statut_modifie_en = Column(Enum(StatutMission, name="statut_mission"), nullable=False)
 
     horodatage = Column(DateTime(timezone=True), nullable=False,

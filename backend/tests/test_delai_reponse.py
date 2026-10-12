@@ -91,8 +91,8 @@ def test_sans_reponse_la_mission_passe_au_suivant(client, reg, medecin):
     assert m["brancardier_id"] == muet
 
     assert expirer(31) == 1
-    # L'agent qui n'a pas répondu n'est peut-être plus joignable : il passe INDISPONIBLE
-    assert statut_agent(muet) == StatutAgent.INDISPONIBLE
+    # Première non-réponse : l'agent reste disponible (mains prises ?), mais perd cette mission
+    assert statut_agent(muet) == StatutAgent.DISPONIBLE
     assert client.get("/missions/moi", headers=entetes).json() is None
     apres = client.get(f"/missions/{m['id']}", headers=medecin).json()
     assert apres["statut"] == "PROPOSE" and apres["brancardier_id"] == suivant
@@ -101,6 +101,7 @@ def test_sans_reponse_la_mission_passe_au_suivant(client, reg, medecin):
     lignes = client.get(f"/missions/{m['id']}/historique", headers=medecin).json()
     assert [l["statut_modifie_en"] for l in lignes] == ["EN_ATTENTE", "PROPOSE", "EN_ATTENTE", "PROPOSE"]
     assert (lignes[2]["auteur_id"], lignes[2]["motif_refus"]) == (None, None)
+    assert lignes[2]["brancardier_id"] == muet   # l'agent qui n'a pas répondu est tracé
 
 
 def test_sans_reponse_et_personne_d_autre(client, reg, medecin):

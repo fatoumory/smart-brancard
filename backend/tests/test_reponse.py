@@ -101,15 +101,15 @@ def test_refus_reaffecte_au_suivant(client, reg, medecin):
     m = demande(client, medecin)
     assert m["brancardier_id"] == proche
 
-    r = client.put(f"/missions/{m['id']}/refuse", json={"motif": "MATERIEL_DEFECTUEUX"}, headers=entetes)
+    r = client.put(f"/missions/{m['id']}/refuse", json={"motif": "INDISPONIBILITE_PHYSIQUE"}, headers=entetes)
     assert r.status_code == 200, r.text
     assert r.json()["statut"] == "PROPOSE" and r.json()["brancardier_id"] == suivant
-    # Matériel défectueux : l'agent ne peut plus transporter
+    # Indisponibilité physique : l'agent ne peut plus transporter
     assert statut_agent(proche) == StatutAgent.INDISPONIBLE
 
     lignes = client.get(f"/missions/{m['id']}/historique", headers=medecin).json()
     assert [l["statut_modifie_en"] for l in lignes] == ["EN_ATTENTE", "PROPOSE", "EN_ATTENTE", "PROPOSE"]
-    assert (lignes[2]["auteur_id"], lignes[2]["motif_refus"]) == (proche, "MATERIEL_DEFECTUEUX")
+    assert (lignes[2]["auteur_id"], lignes[2]["motif_refus"]) == (proche, "INDISPONIBILITE_PHYSIQUE")
     assert lignes[3]["auteur_id"] is None   # nouvelle proposition de l'algorithme
 
 
@@ -125,7 +125,7 @@ def test_refus_sans_autre_agent(client, reg, medecin):
 
 
 @pytest.mark.parametrize("motif, statut_attendu", [
-    ("MATERIEL_DEFECTUEUX", StatutAgent.INDISPONIBLE),
+    ("MATERIEL_DEFECTUEUX", StatutAgent.DISPONIBLE),   # son matériel est en cause, pas lui
     ("INDISPONIBILITE_PHYSIQUE", StatutAgent.INDISPONIBLE),
     ("FIN_SERVICE", StatutAgent.INDISPONIBLE),
     ("URGENCE_PRIORITAIRE", StatutAgent.EN_PAUSE),

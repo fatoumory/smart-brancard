@@ -49,6 +49,8 @@ class UtilisateurOut(BaseModel):
     position_noeud_id: int | None = None
     position_noeud_nom: str | None = None
     position_date: datetime | None = None
+    # False : dernière détection de plus de 10 min (position à afficher comme incertaine)
+    position_recente: bool | None = None
     # Fin prévue de la pause en cours (le téléphone affiche le compte à rebours à partir de cette heure)
     fin_pause: datetime | None = None
 

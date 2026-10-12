@@ -1,11 +1,12 @@
 # services/assignation_service.py
 # Assignation automatique des missions aux brancardiers (CDC §5.3).
 #
-# Règle de choix : parmi les brancardiers actifs et DISPONIBLES,
-#   1. le plus proche du point de départ (temps de trajet calculé par Dijkstra),
-#   2. à égalité, celui qui a effectué le moins de missions aujourd'hui (équité de charge).
-# Un agent jamais détecté par une balise reste éligible, mais passe après les agents localisés.
-# Un agent qui a déjà refusé la mission n'est plus sollicité pour elle.
+# Règle de choix : parmi les brancardiers actifs et DISPONIBLES, le plus petit score
+#     score = temps de trajet jusqu'au départ (Dijkstra, en minutes) + k × missions du jour
+# k (« combien de minutes vaut une mission déjà faite ») équilibre la charge entre agents proches,
+# sans jamais envoyer un agent beaucoup plus loin. En URGENT, k = 0 : seule la distance compte.
+# Un agent sans position récente (aucune détection depuis 10 min) passe après les agents localisés.
+# Un agent qui a refusé la mission, ou l'a laissée sans réponse, n'est plus sollicité pour elle.
 #
 # Verrouillage : la mission et les agents candidats sont verrouillés en base (SELECT ... FOR UPDATE)
 # pendant le choix, et un index unique interdit à un agent d'avoir deux missions actives.
@@ -24,7 +25,7 @@ from models.mission import Mission
 from models.utilisateur import Brancardier
 from services.graphe_service import construire_graphe
 from services.historique_service import changer_statut
-from services.position_service import positions_actuelles
+from services.position_service import en_utc, positions_actuelles
 
 # Ordre de traitement de la file : les plus urgentes d'abord, puis les plus anciennes
 ORDRE_URGENCE = case(
@@ -52,20 +53,44 @@ def incrementer_compteur(agent: Brancardier) -> None:
 
 #  Choix de l'agent
 
-def agents_ayant_refuse(db: Session, mission_id: int) -> set[int]:
-    """Agents qui ont déjà refusé cette mission (une ligne d'historique avec un motif de refus)"""
-    lignes = (db.query(Historique.auteur_id)
+# Poids de l'équité de charge selon l'urgence, en minutes de trajet par mission déjà faite
+K_EQUITE_MIN = {
+    NiveauUrgence.URGENT: 0.0,   # délai garanti de 3 min : seule la distance compte
+    NiveauUrgence.HAUTE: 0.5,
+    NiveauUrgence.MOYENNE: 0.5,
+    NiveauUrgence.BASSE: 0.5,
+}
+
+
+def agents_exclus(db: Session, mission_id: int) -> set[int]:
+    """Agents à ne plus solliciter pour cette mission : ceux qui l'ont refusée ou laissée sans réponse.
+    Ce sont les retours en attente du journal qui désignent un agent."""
+    lignes = (db.query(Historique.brancardier_id, Historique.auteur_id, Historique.motif_refus)
               .filter(Historique.mission_id == mission_id,
-                      Historique.motif_refus.is_not(None),
-                      Historique.auteur_id.is_not(None))
+                      Historique.statut_modifie_en == StatutMission.EN_ATTENTE)
               .all())
-    return {auteur_id for (auteur_id,) in lignes}
+    exclus = {agent_id for agent_id, _, _ in lignes if agent_id is not None}
+    # Refus enregistrés avant l'ajout de la colonne « agent concerné » : l'agent est l'auteur
+    exclus |= {auteur_id for _, auteur_id, motif in lignes if motif is not None and auteur_id is not None}
+    return exclus
+
+
+def bloquee_pour_materiel(db: Session, mission_id: int) -> bool:
+    """Le dernier événement de la mission est un refus pour matériel défectueux.
+    Elle n'est plus proposée automatiquement : le régulateur décide (réaffecter ou annuler),
+    pour éviter que toute l'équipe refuse à tour de rôle si le dépôt n'a plus de matériel valide."""
+    derniere = (db.query(Historique.statut_modifie_en, Historique.motif_refus)
+                .filter(Historique.mission_id == mission_id)
+                .order_by(Historique.horodatage.desc(), Historique.id.desc())
+                .first())
+    return (derniere is not None and derniere.statut_modifie_en == StatutMission.EN_ATTENTE
+            and derniere.motif_refus == MotifRefus.MATERIEL_DEFECTUEUX)
 
 
 def classer_candidats(db: Session, mission: Mission, candidats: list[Brancardier]) -> list[tuple]:
     """Classe les candidats du meilleur au moins bon.
-    Renvoie [(agent, temps de trajet en minutes ou inf, missions du jour), ...]."""
-    positions = positions_actuelles(db, [a.id for a in candidats])
+    Renvoie [(agent, score, temps de trajet en minutes ou inf, missions du jour), ...]."""
+    positions = positions_actuelles(db, [a.id for a in candidats], recentes_seulement=True)
 
     # Temps de trajet depuis le point de départ vers tous les lieux, en un seul calcul de Dijkstra
     # (le graphe n'est pas orienté : départ -> agent = agent -> départ)
@@ -75,15 +100,17 @@ def classer_candidats(db: Session, mission: Mission, candidats: list[Brancardier
     else:
         distances = {}
 
+    k = K_EQUITE_MIN[mission.niveau_urgence]
     classement = []
     for agent in candidats:
         detection = positions.get(agent.id)
-        # Position inconnue, ou lieu inaccessible (couloir bloqué) : l'agent passe en dernier
+        # Position inconnue ou trop ancienne, ou lieu inaccessible (couloir bloqué) : en dernier
         distance = distances.get(detection.noeud_id, math.inf) if detection else math.inf
-        classement.append((agent, distance, compteur_du_jour(agent)))
+        missions = compteur_du_jour(agent)
+        classement.append((agent, distance + k * missions, distance, missions))
 
-    # Distance d'abord, puis équité de charge ; l'id départage pour un résultat stable
-    classement.sort(key=lambda c: (c[1], c[2], c[0].id))
+    # Plus petit score ; à score égal, le moins chargé ; l'id départage pour un résultat stable
+    classement.sort(key=lambda c: (c[1], c[3], c[0].id))
     return classement
 
 
@@ -93,11 +120,12 @@ def assigner_automatiquement(db: Session, mission_id: int) -> Brancardier | None
     Fait le commit lui-même : la proposition est enregistrée ou rien ne change."""
     # Verrou sur la mission : une seule assignation à la fois pour elle
     mission = db.query(Mission).filter(Mission.id == mission_id).with_for_update().one_or_none()
-    if mission is None or mission.statut != StatutMission.EN_ATTENTE:
+    if (mission is None or mission.statut != StatutMission.EN_ATTENTE
+            or bloquee_pour_materiel(db, mission.id)):
         db.rollback()
         return None
 
-    exclus = agents_ayant_refuse(db, mission.id)
+    exclus = agents_exclus(db, mission.id)
     # Verrou sur les agents libres ; un agent déjà verrouillé par une autre assignation est sauté
     requete = (db.query(Brancardier)
                .filter(Brancardier.est_actif.is_(True),
@@ -117,7 +145,7 @@ def assigner_automatiquement(db: Session, mission_id: int) -> Brancardier | None
     mission.brancardier_id = agent.id
     agent.statut = StatutAgent.EN_MISSION
     # auteur_id=None : c'est l'algorithme qui a choisi l'agent (badge « Auto » côté dashboard)
-    changer_statut(db, mission, StatutMission.PROPOSE, auteur_id=None)
+    changer_statut(db, mission, StatutMission.PROPOSE, auteur_id=None, agent_id=agent.id)
     try:
         db.commit()
     except IntegrityError:
@@ -173,7 +201,8 @@ def accepter_mission(db: Session, mission_id: int, agent: Brancardier) -> Missio
     """L'agent accepte : la mission passe ACCEPTE (il rejoint le patient), l'agent reste EN_MISSION.
     L'acceptation est une décision explicite de l'agent, tracée dans le journal (CDC §7.3)."""
     mission = mission_proposee_a(db, mission_id, agent)
-    changer_statut(db, mission, StatutMission.ACCEPTE, auteur_id=agent.id)
+    changer_statut(db, mission, StatutMission.ACCEPTE, auteur_id=agent.id, agent_id=agent.id)
+    agent.non_reponses = 0
     db.commit()
     return mission
 
@@ -183,12 +212,19 @@ def refuser_mission(db: Session, mission_id: int, agent: Brancardier, motif: Mot
     Le refus est tracé avec son motif ; il exclut l'agent des prochaines propositions de cette mission."""
     mission = mission_proposee_a(db, mission_id, agent)
     mission.brancardier_id = None
-    changer_statut(db, mission, StatutMission.EN_ATTENTE, auteur_id=agent.id, motif_refus=motif)
+    changer_statut(db, mission, StatutMission.EN_ATTENTE, auteur_id=agent.id, motif_refus=motif,
+                   agent_id=agent.id)
+    agent.non_reponses = 0
     if motif == MotifRefus.URGENCE_PRIORITAIRE:
         # Retenu par une autre urgence : il se met en pause, et revient quand il a fini
         mettre_en_pause(agent)
+    elif motif == MotifRefus.MATERIEL_DEFECTUEUX:
+        # Son matériel est en cause, pas lui : il reste disponible (il peut en prendre au dépôt).
+        # La mission, elle, attend la décision du régulateur (voir bloquee_pour_materiel)
+        agent.statut = StatutAgent.DISPONIBLE
+        agent.fin_pause = None
     else:
-        # Matériel défectueux, état physique, fin de service : il ne peut plus transporter
+        # État physique, fin de service : il ne peut plus transporter
         agent.statut = StatutAgent.INDISPONIBLE
         agent.fin_pause = None
     db.commit()
@@ -236,44 +272,57 @@ def gerer_reprise_service_auto(db: Session) -> int:
 
 #  Délai de réponse à une proposition (CDC §5.3, maquette : « Répondez dans 30 s »)
 
-DELAI_REPONSE = timedelta(seconds=30)
+# Plus la mission est urgente, plus la réponse doit être rapide ; un agent aux mains prises
+# a plus de temps pour une mission peu urgente
+DELAIS_REPONSE = {
+    NiveauUrgence.URGENT: timedelta(seconds=30),
+    NiveauUrgence.HAUTE: timedelta(seconds=45),
+    NiveauUrgence.MOYENNE: timedelta(seconds=60),
+    NiveauUrgence.BASSE: timedelta(seconds=60),
+}
+DELAI_REPONSE_MIN = min(DELAIS_REPONSE.values())
 
-
-def date_proposition(db: Session, mission_id: int) -> datetime | None:
-    """Heure de la dernière proposition de la mission (lue dans le journal d'audit)"""
-    return (db.query(func.max(Historique.horodatage))
-            .filter(Historique.mission_id == mission_id,
-                    Historique.statut_modifie_en == StatutMission.PROPOSE)
-            .scalar())
+# Nombre de propositions laissées sans réponse d'affilée avant de passer l'agent INDISPONIBLE
+NON_REPONSES_AVANT_INDISPONIBILITE = 2
 
 
 def gerer_propositions_expirees(db: Session, instant: datetime | None = None) -> int:
-    """Sans réponse 30 s après la proposition : l'agent passe INDISPONIBLE (il n'est peut-être
-    plus joignable) et la mission repart vers un autre agent.
+    """Sans réponse dans le délai (30 à 60 s selon l'urgence), la mission repart vers un autre agent.
+    L'agent est exclu de cette mission ; à la 2e non-réponse d'affilée, il passe INDISPONIBLE
+    (il n'est sans doute plus joignable). Une seule non-réponse : il reste disponible.
     Appelé régulièrement par la tâche de fond. `instant` permet aux tests de simuler l'heure.
     Renvoie le nombre de propositions expirées."""
-    limite = (instant or maintenant()) - DELAI_REPONSE
+    instant = instant or maintenant()
 
     # Dernière proposition de chaque mission
     derniere = (db.query(Historique.mission_id, func.max(Historique.horodatage).label("proposee_a"))
                 .filter(Historique.statut_modifie_en == StatutMission.PROPOSE)
                 .group_by(Historique.mission_id)
                 .subquery())
+    # Présélection en base avec le délai le plus court, puis délai exact de chaque mission.
     # Verrou : une mission que l'agent est en train d'accepter (déjà verrouillée) est laissée de côté
-    expirees = (db.query(Mission)
-                .join(derniere, derniere.c.mission_id == Mission.id)
-                .filter(Mission.statut == StatutMission.PROPOSE, derniere.c.proposee_a <= limite)
-                .with_for_update(skip_locked=True, of=Mission)
-                .all())
+    candidates = (db.query(Mission, derniere.c.proposee_a)
+                  .join(derniere, derniere.c.mission_id == Mission.id)
+                  .filter(Mission.statut == StatutMission.PROPOSE,
+                          derniere.c.proposee_a <= instant - DELAI_REPONSE_MIN)
+                  .with_for_update(skip_locked=True, of=Mission)
+                  .all())
+    expirees = [m for m, proposee_a in candidates
+                if en_utc(proposee_a) + DELAIS_REPONSE[m.niveau_urgence] <= instant]
 
     for mission in expirees:
         agent = db.get(Brancardier, mission.brancardier_id)
         if agent is not None:
-            agent.statut = StatutAgent.INDISPONIBLE
+            agent.non_reponses += 1
+            agent.statut = (StatutAgent.INDISPONIBLE
+                            if agent.non_reponses >= NON_REPONSES_AVANT_INDISPONIBILITE
+                            else StatutAgent.DISPONIBLE)
             agent.fin_pause = None
         mission.brancardier_id = None
-        # Retour en attente décidé par le système (auteur vide), sans motif : ce n'est pas un refus
-        changer_statut(db, mission, StatutMission.EN_ATTENTE, auteur_id=None)
+        # Retour en attente décidé par le système (auteur vide), sans motif : ce n'est pas un refus.
+        # L'agent concerné est noté : il ne sera plus sollicité pour cette mission
+        changer_statut(db, mission, StatutMission.EN_ATTENTE, auteur_id=None,
+                       agent_id=agent.id if agent else None)
     db.commit()
 
     if expirees:

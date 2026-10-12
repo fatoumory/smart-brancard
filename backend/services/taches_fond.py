@@ -1,6 +1,6 @@
 # services/taches_fond.py
 # Tâches exécutées régulièrement par le serveur, sans attendre qu'un utilisateur fasse une requête.
-# Exemples : une proposition restée sans réponse 30 s est réaffectée ; un agent en pause qui a fermé
+# Exemples : une proposition restée sans réponse dans son délai (30 à 60 s) est réaffectée ; un agent en pause qui a fermé
 # son application est quand même remis disponible à la fin de sa pause.
 
 import asyncio
@@ -22,7 +22,7 @@ def executer_taches_periodiques() -> None:
     try:
         expirees = gerer_propositions_expirees(db)
         if expirees:
-            journal.info("%s proposition(s) sans réponse après 30 s, réaffectée(s)", expirees)
+            journal.info("%s proposition(s) restée(s) sans réponse dans le délai, réaffectée(s)", expirees)
         repris = gerer_reprise_service_auto(db)
         if repris:
             journal.info("%s agent(s) remis disponible(s) en fin de pause", repris)
