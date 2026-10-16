@@ -10,6 +10,8 @@ _db = Path(tempfile.gettempdir()) / "smart_brancard_test.db"
 _db.unlink(missing_ok=True)
 os.environ["DATABASE_URL"] = f"sqlite:///{_db.as_posix()}"
 os.environ["SECRET_KEY"] = "cle_de_test"
+# Pas de tâches de fond pendant les tests : elles sont appelées directement quand il le faut
+os.environ["TACHES_FOND_INTERVALLE"] = "0"
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pytest

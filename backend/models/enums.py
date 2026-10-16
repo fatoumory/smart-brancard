@@ -22,6 +22,8 @@ class StatutAgent(str, Enum):
 class StatutMission(str, Enum):
     EN_ATTENTE = "EN_ATTENTE"
     PROPOSE = "PROPOSE"
+    # Le brancardier a accepté la mission et rejoint le patient (avant le scan de départ)
+    ACCEPTE = "ACCEPTE"
     EN_TRANSIT = "EN_TRANSIT"
     TERMINE = "TERMINE"
     ANNULE = "ANNULE"
@@ -32,6 +34,16 @@ class NiveauUrgence(str, Enum):
     MOYENNE = "MOYENNE"
     HAUTE = "HAUTE"
     URGENT = "URGENT"
+
+
+# Délai garanti de prise en charge selon l'urgence, en minutes (feuille de route, Sprint 5 ;
+# maquette : « Délai SLA garanti »). Même valeurs que frontend/src/services/referentiel.js
+DELAI_GARANTI_MIN = {
+    NiveauUrgence.URGENT: 3,
+    NiveauUrgence.HAUTE: 8,
+    NiveauUrgence.MOYENNE: 15,
+    NiveauUrgence.BASSE: 30,
+}
 
 
 class Materiel(str, Enum):

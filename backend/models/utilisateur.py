@@ -1,6 +1,6 @@
 # models/utilisateur.py
 
-from sqlalchemy import Boolean, Column, Enum, ForeignKey, Integer, String, case
+from sqlalchemy import Boolean, Column, Date, DateTime, Enum, ForeignKey, Integer, String, case
 from database import Base
 from models.enums import Role, StatutAgent
 
@@ -48,5 +48,16 @@ class Brancardier(Utilisateur):
 
     # Nombre de missions effectuées dans la journée (équité de charge), remis à zéro chaque matin
     compteur_mission = Column(Integer, nullable=False, default=0)
+    # Jour auquel le compteur se rapporte : un autre jour, il repart de zéro
+    # (voir services/assignation_service.py, compteur_du_jour)
+    date_compteur = Column(Date, nullable=True)
+
+    # Fin prévue de la pause en cours (vide hors pause). À cette heure, le serveur remet l'agent
+    # DISPONIBLE de lui-même, même si son téléphone est éteint (gerer_reprise_service_auto)
+    fin_pause = Column(DateTime(timezone=True), nullable=True)
+
+    # Propositions laissées sans réponse d'affilée : à 2, l'agent passe INDISPONIBLE.
+    # Remis à zéro dès qu'il répond (acceptation ou refus) ou qu'il se remet disponible.
+    non_reponses = Column(Integer, nullable=False, default=0, server_default="0")
 
     __mapper_args__ = {"polymorphic_identity": "brancardier"}

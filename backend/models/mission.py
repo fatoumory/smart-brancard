@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, Text
+from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, Index, Integer, Text, text
 from database import Base
 from models.enums import Materiel, NiveauUrgence, StatutMission
 
@@ -10,6 +10,14 @@ from models.enums import Materiel, NiveauUrgence, StatutMission
 class Mission(Base):
     # Nom de la table dans PostgreSQL
     __tablename__ = "missions"
+    __table_args__ = (
+        # Verrou technique (CDC §5.3) : un brancardier n'a jamais deux missions actives à la fois.
+        # La base refuse toute seconde mission PROPOSE / ACCEPTE / EN_TRANSIT pour le même agent,
+        # même si deux assignations tournent en même temps.
+        Index("uq_mission_active_par_brancardier", "brancardier_id", unique=True,
+              postgresql_where=text("statut IN ('PROPOSE', 'ACCEPTE', 'EN_TRANSIT')"),
+              sqlite_where=text("statut IN ('PROPOSE', 'ACCEPTE', 'EN_TRANSIT')")),
+    )
 
     # Identifiant unique, généré automatiquement par PostgreSQL
     id = Column(Integer, primary_key=True, index=True)
