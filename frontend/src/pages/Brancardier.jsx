@@ -27,12 +27,12 @@ function Brancardier() {
     const statut = moi && STATUTS_AGENT[moi.statut];
 
     // Change le statut sur le serveur, puis relit le profil pour afficher le nouvel état.
-    // Renvoie true si le changement a réussi.
-    async function changerStatut(nouveau) {
+    // dureePauseMinutes n'est envoyé que pour une pause (15 ou 45 min) : le serveur en déduit l'heure de fin. Renvoie true si le changement a réussi
+    async function changerStatut(nouveau, dureePauseMinutes) {
         setErreurStatut("");
         setEnvoi(true);
         try {
-            await changerMonStatut(nouveau);
+            await changerMonStatut(nouveau, dureePauseMinutes);
             profil.recharger();
             return true;
         } catch (err) {
@@ -69,7 +69,7 @@ function Brancardier() {
                 )}
                 {!moi && profil.chargement && <p className="text-center text-slate-500 py-10">Chargement…</p>}
 
-                {moi && onglet === "mission" && <EcranMission moi={moi} changerStatut={changerStatut} envoi={envoi} />}
+                {moi && onglet === "mission" && <EcranMission moi={moi} changerStatut={changerStatut} envoi={envoi} rechargerProfil={profil.recharger} />}
                 {moi && onglet === "journal" && <EcranJournal />}
                 {moi && onglet === "profil" && <EcranProfil moi={moi} />}
             </main>

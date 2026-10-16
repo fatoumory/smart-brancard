@@ -1,19 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Bell, ChevronDown,CircleAlert, CircleCheck, Clock, Coffee, Moon, Navigation, UtensilsCrossed } from "lucide-react";
 
-// Pause en cours, gardée dans le navigateur pour survivre à un rechargement de la page :
-// { fin: heure de fin en millisecondes, minutes: durée choisie }
-const CLE_PAUSE = "pause_en_cours";
+// À la fin d'une pause, le serveur remet l'agent disponible (sa tâche de fond passe toutes les 5 s) :
+// on relit le profil un peu après, pour afficher le nouveau statut
+const DELAI_RELECTURE_MS = 6000;
 
 const boutonVert = "w-full h-14 rounded-2xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white text-base font-bold flex items-center justify-center gap-2 cursor-pointer";
 
-function lirePause() {
-    try {
-        return JSON.parse(localStorage.getItem(CLE_PAUSE));
-    } catch {
-        return null;
-    }
-}
 
 // Équipe de jour de 6 h à 20 h, équipe de nuit sinon (maquette)
 function estEquipeDeJour() {
@@ -31,21 +24,23 @@ function optionsPause() {
 
 // Onglet « Mission » : ce que voit l'agent selon son statut.
 // La réception d'une mission (accepter / refuser) arrive avec les routes de mission du Sprint 3.
-function EcranMission({ moi, changerStatut, envoi }) {
+function EcranMission({ moi, changerStatut, envoi, rechargerProfil }) {
     const [choixPause, setChoixPause] = useState(false);
 
-    async function commencerPause(minutes) {
+    // La durée choisie est envoyée au serveur, qui calcule l'heure de fin (fin_pause)
+    function commencerPause(minutes) {
         setChoixPause(false);
-        if (await changerStatut("EN_PAUSE")) {
-            localStorage.setItem(CLE_PAUSE, JSON.stringify({ fin: Date.now() + minutes * 60000, minutes }));
-        }
+        changerStatut("EN_PAUSE", minutes);
     }
 
-    async function reprendre() {
-        if (await changerStatut("DISPONIBLE")) localStorage.removeItem(CLE_PAUSE);
+    // Retour volontaire avant la fin de la pause, ou sortie de l'état « indisponible »
+    function reprendre() {
+        changerStatut("DISPONIBLE");
     }
 
-    if (moi.statut === "EN_PAUSE") return <EnPause onReprendre={reprendre} envoi={envoi} />;
+    if (moi.statut === "EN_PAUSE") {
+        return <EnPause finPause={moi.fin_pause} onReprendre={reprendre} onFin={rechargerProfil} envoi={envoi} />;
+    }
 
     if (moi.statut === "INDISPONIBLE") {
         return (
@@ -102,44 +97,44 @@ function Etat({ icone: Icone, couleur, fond, titre, texte, children }) {
     );
 }
 
-// Pause avec compte à rebours ; à la fin, l'agent repasse automatiquement disponible
-function EnPause({ onReprendre, envoi }) {
-    const [pause] = useState(lirePause);
+// Pause avec compte à rebours, calculé à partir de l'heure de fin donnée par le serveur (fin_pause).
+// À la fin, c'est le serveur qui remet l'agent disponible : le téléphone se contente de relire le profil.
+function EnPause({ finPause, onReprendre, onFin, envoi }) {
     const [maintenant, setMaintenant] = useState(() => Date.now());
-    const dejaReprise = useRef(false);
-    const restantMs = pause ? Math.max(0, pause.fin - maintenant) : null;
+    // Temps restant en millisecondes (null si le serveur n'a pas donné d'heure de fin)
+    const restantMs = finPause ? Math.max(0, new Date(finPause).getTime() - maintenant) : null;
 
+    // Battement de l'horloge : l'affichage est recalculé chaque seconde
     useEffect(() => {
-        if (!pause) return undefined;
+        if (!finPause) return undefined;
         const minuteur = setInterval(() => setMaintenant(Date.now()), 1000);
         return () => clearInterval(minuteur);
-    }, [pause]);
+    }, [finPause]);
 
-    // Compte à rebours terminé : reprise du service, une seule fois
+    // Compte à rebours terminé : on laisse au serveur le temps de remettre l'agent disponible,
+    // puis on relit le profil. L'effet ne se relance que quand restantMs change : une seule fois à 0.
     useEffect(() => {
-        if (restantMs === 0 && !dejaReprise.current) {
-            dejaReprise.current = true;
-            onReprendre();
-        }
-    }, [restantMs, onReprendre]);
+        if (restantMs !== 0) return undefined;
+        const minuteur = setTimeout(onFin, DELAI_RELECTURE_MS);
+        return () => clearTimeout(minuteur);
+    }, [restantMs, onFin]);
 
+    // Format horloge mm:ss (ex : 754 s -> "12:34")
     const secondes = Math.ceil((restantMs ?? 0) / 1000);
     const affichage = `${String(Math.floor(secondes / 60)).padStart(2, "0")}:${String(secondes % 60).padStart(2, "0")}`;
 
     return (
         <Etat icone={Clock} couleur="text-orange-600" fond="bg-orange-50" titre="En pause"
             texte={`${estEquipeDeJour() ? "Équipe de jour" : "Équipe de nuit"} · reprise automatique à la fin du compte à rebours`}>
-            {/* Pause lancée depuis un autre appareil : pas de compte à rebours connu ici */}
-            {pause && (
+            {restantMs !== null && (
                 <div className="w-full bg-white rounded-3xl shadow-sm py-6 px-4">
                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Temps restant</p>
                     <p className="text-6xl font-extrabold font-mono text-orange-600 mt-2">{affichage}</p>
-                    <div className="mt-4 h-2 rounded-full bg-slate-100 overflow-hidden">
-                        <div className="h-full bg-orange-500 rounded-full transition-all"
-                            style={{ width: `${(restantMs / (pause.minutes * 60000)) * 100}%` }} />
-                    </div>
+                    {/* Fin atteinte : on attend la confirmation du serveur */}
+                    {restantMs === 0 && <p className="text-sm text-slate-500 mt-3">Reprise du service en cours…</p>}
                 </div>
             )}
+
             <button type="button" onClick={onReprendre} disabled={envoi} className={boutonVert}>
                 <CircleCheck className="w-5 h-5" /> Reprendre le service
             </button>
