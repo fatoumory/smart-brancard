@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { Activity, ArrowRight, ChevronDown, Route } from "lucide-react";
+import { Activity, ArrowRight, ChevronDown, Route, TriangleAlert, Zap } from "lucide-react";
 import { BadgeStatut, BadgeUrgence, Materiel } from "../Badges";
 import { STATUTS_MISSION, URGENCES, formaterHeure, trierParPriorite } from "../../services/referentiel";
 
@@ -7,9 +7,9 @@ const selectClasse = "px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg t
 
 // Tableau des missions, trié par urgence puis ancienneté.
 // Un clic sur une ligne affiche l'itinéraire calculé, étape par étape.
-// agentsParId : { id: brancardier } pour afficher le nom de l'agent assigné
 // typesNoeuds : { id: type_noeud } pour distinguer les ascenseurs dans l'itinéraire
-function FileMissions({ missions, agentsParId, typesNoeuds }) {
+// (le nom de l'agent est fourni par le backend dans chaque mission : brancardier_prenom / _nom)
+function FileMissions({ missions, typesNoeuds }) {
     const [filtreUrgence, setFiltreUrgence] = useState("");
     const [filtreStatut, setFiltreStatut] = useState("");
     const [ouverte, setOuverte] = useState(null);
@@ -74,7 +74,8 @@ function FileMissions({ missions, agentsParId, typesNoeuds }) {
                                 <tr
                                     onClick={() => setOuverte(ouverte === m.id ? null : m.id)}
                                     className={`border-b border-slate-100 cursor-pointer hover:bg-slate-50 ${
-                                        m.niveau_urgence === "URGENT" && m.statut !== "TERMINE" && m.statut !== "ANNULE" ? "bg-red-50/60" : ""}`}
+                                        m.alerte_materiel ? "bg-amber-50"
+                                            : m.niveau_urgence === "URGENT" && m.statut !== "TERMINE" && m.statut !== "ANNULE" ? "bg-red-50/60" : ""}`}
                                 >
                                     <td className="px-4 py-4 font-mono text-sm text-slate-500">#{m.id}</td>
                                     <td className="px-4 py-4">
@@ -90,8 +91,17 @@ function FileMissions({ missions, agentsParId, typesNoeuds }) {
                                         </span>
                                     </td>
                                     <td className="px-4 py-4"><Materiel code={m.materiel_requis} /></td>
-                                    <td className="px-4 py-4 text-sm"><Agent id={m.brancardier_id} agentsParId={agentsParId} /></td>
-                                    <td className="px-4 py-4"><BadgeStatut statut={m.statut} /></td>
+                                    <td className="px-4 py-4 text-sm"><Agent mission={m} /></td>
+                                    <td className="px-4 py-4">
+                                        <BadgeStatut statut={m.statut} />
+                                        {/* Mission bloquée : plus proposée automatiquement, en attente d'une décision */}
+                                        {m.alerte_materiel && (
+                                            <span className="mt-1 flex items-center gap-1 text-xs font-semibold text-amber-700"
+                                                title="Refusée pour matériel défectueux : à réaffecter ou annuler">
+                                                <TriangleAlert className="w-3.5 h-3.5" /> Matériel défectueux
+                                            </span>
+                                        )}
+                                    </td>                                    
                                     <td className="px-4 py-4 font-mono text-sm text-slate-600">{formaterHeure(m.date_creation)}</td>
                                     <td className="px-2 py-4">
                                         <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${ouverte === m.id ? "rotate-180" : ""}`} />
@@ -118,15 +128,25 @@ function FileMissions({ missions, agentsParId, typesNoeuds }) {
     );
 }
 
-function Agent({ id, agentsParId }) {
-    if (id === null) return <span className="text-slate-400">—</span>;
-    const agent = agentsParId[id];
+// Agent de la mission : « A. Cissé », avec le badge « Auto » s'il a été choisi par l'algorithme
+function Agent({ mission }) {
+    if (mission.brancardier_id === null) return <span className="text-slate-400">—</span>;
+    const nom = mission.brancardier_nom
+        ? `${mission.brancardier_prenom?.[0] ?? ""}. ${mission.brancardier_nom}`
+        : `Agent #${mission.brancardier_id}`;
     return (
-        <span className="font-medium text-slate-900">
-            {agent ? `${agent.prenom[0]}. ${agent.nom}` : `Agent #${id}`}
+        <span className="flex flex-col items-start gap-1">
+            <span className="font-medium text-slate-900">{nom}</span>
+            {/* assignation_auto : false si le régulateur l'a choisi à la main (réaffectation) */}
+            {mission.assignation_auto && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primaire-clair text-primaire text-xs font-semibold">
+                    <Zap className="w-3 h-3" /> Auto
+                </span>
+            )}
         </span>
     );
 }
+
 
 // Liste d'étapes de l'itinéraire : "Urgences → Ascenseur A - RDC → ... → Réanimation"
 function Itineraire({ mission, typesNoeuds }) {

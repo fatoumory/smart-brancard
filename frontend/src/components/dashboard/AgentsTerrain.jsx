@@ -1,13 +1,12 @@
 import { MapPin, Users } from "lucide-react";
-import { STATUTS_AGENT } from "../../services/referentiel";
+import { STATUTS_AGENT, formaterHeure } from "../../services/referentiel";
 
 // Couleurs CSS du petit camembert (mêmes teintes que les points de statut)
 const COULEURS_CAMEMBERT = {
     DISPONIBLE: "#047857", EN_MISSION: "#1565c0", EN_PAUSE: "#ea580c", INDISPONIBLE: "#94a3b8",
 };
 
-// Liste des brancardiers avec leur statut et leur nombre de missions du jour.
-// La position (dernière balise détectée) arrivera au Sprint 3.
+// Liste des brancardiers avec leur statut, leur position et leur nombre de missions du jour.
 function AgentsTerrain({ agents, erreur }) {
     return (
         <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -30,7 +29,7 @@ function AgentsTerrain({ agents, erreur }) {
                             <div>
                                 <p className="font-medium text-slate-900">{agent.prenom} {agent.nom}</p>
                                 <p className="flex items-center gap-1 text-sm text-slate-500">
-                                    <MapPin className="w-3.5 h-3.5" /> —
+                                    <Position agent={agent} />
                                 </p>
                             </div>
                             <div className="text-right">
@@ -49,6 +48,29 @@ function AgentsTerrain({ agents, erreur }) {
         </section>
     );
 }
+
+// Position de l'agent : dernière balise qui l'a détecté (champs position_* de GET /utilisateurs)
+function Position({ agent }) {
+    // Jamais détecté par une balise
+    if (!agent.position_noeud_nom) {
+        return (
+            <p className="flex items-center gap-1 text-sm text-slate-400">
+                <MapPin className="w-3.5 h-3.5" /> Position inconnue
+            </p>
+        );
+    }
+    // Dernière détection de plus de 10 min : l'agent a pu bouger, la position est affichée comme incertaine
+    const incertaine = !agent.position_recente;
+    return (
+        <p className={`flex items-center gap-1 text-sm ${incertaine ? "text-slate-400 italic" : "text-slate-500"}`}
+            title={incertaine ? "Aucune détection depuis plus de 10 minutes" : undefined}>
+            <MapPin className="w-3.5 h-3.5 shrink-0" />
+            {agent.position_noeud_nom}
+            {incertaine && ` · vu à ${formaterHeure(agent.position_date)}`}
+        </p>
+    );
+}
+
 
 // Répartition des agents par statut, dessinée avec un dégradé conique CSS
 function Camembert({ agents }) {

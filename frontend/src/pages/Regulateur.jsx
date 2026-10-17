@@ -20,10 +20,12 @@ function Regulateur() {
     const aujourdhui = new Date().toDateString();
     const compter = (statut) => liste.filter((m) => m.statut === statut).length;
     const disponibles = agents.donnees?.filter((a) => a.statut === "DISPONIBLE").length ?? 0;
-    const agentsParId = Object.fromEntries((agents.donnees ?? []).map((a) => [a.id, a]));
     const typesNoeuds = Object.fromEntries((noeuds.donnees ?? []).map((n) => [n.id, n.type_noeud]));
-    const terminees = liste.filter((m) => m.statut === "TERMINE"
-        && new Date(m.date_creation).toDateString() === aujourdhui).length;
+    // Terminées aujourd'hui : d'après l'heure de fin réelle (date_fin, lue dans le journal),
+    // et non l'heure de la demande (une demande d'hier terminée ce matin compte pour aujourd'hui)
+    const terminees = liste.filter((m) => m.statut === "TERMINE" && m.date_fin
+        && new Date(m.date_fin).toDateString() === aujourdhui).length;
+
 
     function toutRecharger() {
         missions.recharger();
@@ -70,7 +72,7 @@ function Regulateur() {
                         detail="Aujourd'hui, depuis minuit" icone={CircleCheck} couleur="vert" />
                 </div>
 
-                {missions.donnees && <FileMissions missions={liste} agentsParId={agentsParId} typesNoeuds={typesNoeuds} />}
+                {missions.donnees && <FileMissions missions={liste} typesNoeuds={typesNoeuds} />}
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                     <AgentsTerrain agents={agents.donnees} erreur={agents.erreur} />
