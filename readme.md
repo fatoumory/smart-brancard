@@ -141,8 +141,21 @@ Ouvrir http://localhost:4173 dans Chrome, puis cliquer sur l'icône « Installer
 
 - Le service worker ne met en cache que les fichiers de l'application (JS, CSS, icônes), **jamais les réponses de l'API** : aucune donnée patient ne reste sur l'appareil (CDC §7.2).
 - Une nouvelle version déployée est récupérée automatiquement.
-- Sur un vrai téléphone, l'installation exige le HTTPS (prévu au Sprint 3).
+- Sur un vrai téléphone, l'installation exige le HTTPS (voir ci-dessous).
 - Les icônes sont générées à partir de `frontend/public/logo.svg` avec `npm run generate-pwa-assets`.
+
+### Tester sur un vrai téléphone (caméra, NFC)
+
+La caméra (scan du bracelet QR) et Web NFC (tags muraux) ne fonctionnent qu'en **HTTPS**. Le PC et le téléphone doivent être sur le même Wi-Fi. Backend lancé normalement, puis dans `frontend/` :
+```powershell
+npm run dev:mobile
+```
+Ouvrir sur le téléphone l'adresse **https://&lt;IP du PC&gt;:5173** affichée par Vite (ligne « Network »), puis accepter l'avertissement du certificat auto-signé (« Paramètres avancés » → « Continuer »).
+
+- Les appels à l'API passent par le proxy `/api` du serveur Vite : pas de réglage CORS à changer côté backend.
+- **NFC** : Chrome sur Android uniquement. Chaque tag contient un enregistrement texte avec le code de la salle (ex. `NFC-RDC-URG`, voir `backend/data/graphe_hopital.json`) ; une application comme « NFC Tools » permet de l'écrire.
+- **Secours** (téléphone sans NFC, démonstration) : un QR code contenant le même texte, collé à côté du tag, se scanne avec la caméra. La saisie au clavier reste possible en dernier recours.
+- Le bracelet du patient est un QR code contenant `QR-<IPP>` (ex. `QR-00000004`).
 
 ## Organisation du frontend
 
@@ -178,7 +191,7 @@ npm run build
 - **Journal d'audit immuable** : chaque changement de statut d'une mission ajoute une ligne horodatée. Un déclencheur PostgreSQL interdit de les modifier ou de les supprimer (CDC §7.3).
 - **Aucune donnée clinique** n'est stockée, seulement l'identité et la logistique du transport (CDC §7.2).
 - **Session de 8 h côté frontend** : le jeton JWT est gardé dans le navigateur. Un jeton expiré, ou une réponse 401 de l'API, renvoie à l'écran de connexion. La déconnexion efface le jeton et le rôle.
-- **Rafraîchissement périodique** : le dashboard se met à jour toutes les 15 s et le suivi du médecin se rafraîchit à la demande. Les WebSockets du Sprint 4 remplaceront ces mécanismes.
+- **Rafraîchissement périodique** : le dashboard se met à jour toutes les 15 s, le suivi du médecin toutes les 10 s, et la mission du brancardier toutes les 5 s (une proposition n'attend que 30 à 60 s). Les WebSockets du Sprint 4 remplaceront ces mécanismes.
 
 ## Avancement
 

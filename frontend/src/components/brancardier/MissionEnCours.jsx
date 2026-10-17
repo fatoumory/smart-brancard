@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Check, CircleCheck, Flag, MapPin, PackageOpen, Route, ShieldAlert, Siren, UserRound, X } from "lucide-react";
 import { BadgeUrgence, Materiel } from "../Badges";
 import { formaterHeure } from "../../services/referentiel";
+import ChampScan from "./ChampScan";
 
 // Les 5 étapes du parcours d'une mission (CDC §5.5).
 // ACCEPTE : l'agent est « En route » vers le patient ; EN_TRANSIT : le patient est « Transporté ».
@@ -130,19 +131,6 @@ function EtapesParcours({ courante }) {
     );
 }
 
-// Champ de saisie d'un code (tag NFC ou bracelet).
-// Il sera rempli automatiquement par la lecture NFC / QR (tâche suivante) ; en attendant, on tape le code.
-function ChampCode({ id, libelle, exemple, valeur, onChange }) {
-    return (
-        <label htmlFor={id} className="block">
-            <span className="block text-sm font-semibold text-slate-700 mb-1">{libelle}</span>
-            <input id={id} value={valeur} onChange={(e) => onChange(e.target.value)} required
-                placeholder={exemple} autoComplete="off" autoCapitalize="characters" spellCheck={false}
-                className="w-full h-12 px-4 rounded-xl border border-slate-300 font-mono uppercase placeholder:normal-case placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-primaire" />
-        </label>
-    );
-}
-
 // Envoie un scan au serveur et garde son message d'erreur pour l'afficher sous le formulaire
 // (ex : « Ce bracelet n'est pas celui du patient de la mission : vérifiez son identité »).
 function useEnvoiScan(onValider) {
@@ -185,8 +173,8 @@ function ScanDepart({ urgent, salle, onValider }) {
                 <p className="font-bold text-slate-900">Prise en charge du patient</p>
                 <p className="text-sm text-slate-500">Arrivé en {salle} : scannez le tag de la salle, puis le bracelet du patient.</p>
             </div>
-            <ChampCode id="tag-depart" libelle="Tag NFC de la salle" exemple="NFC-…" valeur={tag} onChange={setTag} />
-            <ChampCode id="bracelet" libelle="Bracelet du patient (QR code)" exemple="QR-…" valeur={bracelet} onChange={setBracelet} />
+            <ChampScan id="tag-depart" type="nfc" libelle="Tag NFC de la salle" exemple="NFC-…" valeur={tag} onChange={setTag} />
+            <ChampScan id="bracelet" type="qr" libelle="Bracelet du patient (QR code)" exemple="QR-…" valeur={bracelet} onChange={setBracelet} />
 
             {erreur && <p role="alert" className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl">{erreur}</p>}
 
@@ -238,7 +226,7 @@ function ScanArrivee({ salle, onValider }) {
                 <p className="font-bold text-slate-900">Arrivée à destination</p>
                 <p className="text-sm text-slate-500">Arrivé en {salle} : scannez le tag de la salle pour terminer la mission.</p>
             </div>
-            <ChampCode id="tag-arrivee" libelle="Tag NFC de la salle" exemple="NFC-…" valeur={tag} onChange={setTag} />
+            <ChampScan id="tag-arrivee" type="nfc" libelle="Tag NFC de la salle" exemple="NFC-…" valeur={tag} onChange={setTag} />
 
             {erreur && <p role="alert" className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl">{erreur}</p>}
 
