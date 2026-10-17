@@ -1,18 +1,39 @@
 import { Fragment, useState } from "react";
-import { Activity, ArrowRight, ChevronDown, Route, TriangleAlert, Zap } from "lucide-react";
+import { Activity, ArrowRight, Ban, ChevronDown, MoreHorizontal, Route, TriangleAlert, UserRoundCog, Zap } from "lucide-react";
 import { BadgeStatut, BadgeUrgence, Materiel } from "../Badges";
+import ActionRegulation from "./ActionRegulation";
 import { STATUTS_MISSION, URGENCES, formaterHeure, trierParPriorite } from "../../services/referentiel";
 
 const selectClasse = "px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 cursor-pointer";
 
+// Le régulateur peut réaffecter ou annuler tant que le patient n'est pas en transport
+// (même règle que le backend : services/regulation_service.py)
+const STATUTS_MODIFIABLES = ["EN_ATTENTE", "PROPOSE", "ACCEPTE"];
+
 // Tableau des missions, trié par urgence puis ancienneté.
-// Un clic sur une ligne affiche l'itinéraire calculé, étape par étape.
+// Un clic sur une ligne (ou sur « ⋯ ») affiche l'itinéraire et les actions du régulateur.
 // typesNoeuds : { id: type_noeud } pour distinguer les ascenseurs dans l'itinéraire
+// agents : brancardiers (pour la réaffectation) ; onAction : appelé après une action réussie
 // (le nom de l'agent est fourni par le backend dans chaque mission : brancardier_prenom / _nom)
-function FileMissions({ missions, typesNoeuds }) {
+function FileMissions({ missions, typesNoeuds, agents, onAction }) {
     const [filtreUrgence, setFiltreUrgence] = useState("");
     const [filtreStatut, setFiltreStatut] = useState("");
     const [ouverte, setOuverte] = useState(null);
+    // Action en cours dans la ligne ouverte : "reaffecter", "annuler" ou null
+    const [action, setAction] = useState(null);
+
+    // Ouvre ou ferme le détail d'une mission ; une action commencée est abandonnée
+    function basculer(id) {
+        setOuverte(ouverte === id ? null : id);
+        setAction(null);
+    }
+
+    // Action réussie : on referme le détail et le dashboard relit missions et agents
+    function actionFaite() {
+        setOuverte(null);
+        setAction(null);
+        onAction();
+    }
 
     const aTraiter = missions.filter((m) => m.statut === "EN_ATTENTE" || m.statut === "PROPOSE").length;
     const visibles = trierParPriorite(missions).filter((m) =>
@@ -58,13 +79,14 @@ function FileMissions({ missions, typesNoeuds }) {
                             <th className="px-4 py-3">Agent assigné</th>
                             <th className="px-4 py-3">Statut</th>
                             <th className="px-4 py-3">Heure</th>
+                            <th className="px-2 py-3"><span className="sr-only">Actions</span></th>
                             <th className="px-2 py-3"><span className="sr-only">Itinéraire</span></th>
                         </tr>
                     </thead>
                     <tbody>
                         {visibles.length === 0 && (
                             <tr>
-                                <td colSpan={9} className="px-4 py-10 text-center text-slate-500">
+                                <td colSpan={10} className="px-4 py-10 text-center text-slate-500">
                                     Aucune mission ne correspond à ces filtres.
                                 </td>
                             </tr>
@@ -72,7 +94,7 @@ function FileMissions({ missions, typesNoeuds }) {
                         {visibles.map((m) => (
                             <Fragment key={m.id}>
                                 <tr
-                                    onClick={() => setOuverte(ouverte === m.id ? null : m.id)}
+                                    onClick={() => basculer(m.id)}
                                     className={`border-b border-slate-100 cursor-pointer hover:bg-slate-50 ${
                                         m.alerte_materiel ? "bg-amber-50"
                                             : m.niveau_urgence === "URGENT" && m.statut !== "TERMINE" && m.statut !== "ANNULE" ? "bg-red-50/60" : ""}`}
@@ -103,13 +125,44 @@ function FileMissions({ missions, typesNoeuds }) {
                                         )}
                                     </td>                                    
                                     <td className="px-4 py-4 font-mono text-sm text-slate-600">{formaterHeure(m.date_creation)}</td>
+                                    {/* Menu « ⋯ » : seulement si la mission peut encore être modifiée */}
+                                    <td className="px-2 py-4">
+                                        {STATUTS_MODIFIABLES.includes(m.statut) && (
+                                            <button type="button" title="Réaffecter ou annuler" aria-label={`Actions sur la mission ${m.id}`}
+                                                onClick={(e) => {
+                                                    // Sans stopPropagation, le clic refermerait aussi la ligne
+                                                    e.stopPropagation();
+                                                    setOuverte(m.id);
+                                                    setAction(null);
+                                                }}
+                                                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-200 cursor-pointer">
+                                                <MoreHorizontal className="w-5 h-5" />
+                                            </button>
+                                        )}
+                                    </td>
                                     <td className="px-2 py-4">
                                         <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${ouverte === m.id ? "rotate-180" : ""}`} />
                                     </td>
                                 </tr>
                                 {ouverte === m.id && (
                                     <tr className="bg-slate-50 border-b border-slate-200">
-                                        <td colSpan={9} className="px-4 py-4">
+                                        <td colSpan={10} className="px-4 py-4 space-y-3">
+                                            {/* Actions du régulateur : d'abord le choix, puis le panneau de l'action */}
+                                            {STATUTS_MODIFIABLES.includes(m.statut) && (action ? (
+                                                <ActionRegulation type={action} mission={m} agents={agents}
+                                                    onFait={actionFaite} onFermer={() => setAction(null)} />
+                                            ) : (
+                                                <div className="flex flex-wrap gap-2">
+                                                    <button type="button" onClick={() => setAction("reaffecter")}
+                                                        className="px-3 py-2 rounded-lg bg-white border border-slate-200 text-sm font-semibold text-slate-700 flex items-center gap-2 hover:bg-slate-100 cursor-pointer">
+                                                        <UserRoundCog className="w-4 h-4 text-primaire" /> Réaffecter
+                                                    </button>
+                                                    <button type="button" onClick={() => setAction("annuler")}
+                                                        className="px-3 py-2 rounded-lg bg-white border border-red-200 text-sm font-semibold text-red-700 flex items-center gap-2 hover:bg-red-50 cursor-pointer">
+                                                        <Ban className="w-4 h-4" /> Annuler la mission
+                                                    </button>
+                                                </div>
+                                            ))}
                                             <Itineraire mission={m} typesNoeuds={typesNoeuds} />
                                             {m.consigne && (
                                                 <p className="text-sm text-slate-600 mt-3">

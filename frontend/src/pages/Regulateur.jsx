@@ -72,7 +72,11 @@ function Regulateur() {
                         detail="Aujourd'hui, depuis minuit" icone={CircleCheck} couleur="vert" />
                 </div>
 
-                {missions.donnees && <FileMissions missions={liste} typesNoeuds={typesNoeuds} />}
+                {/* Après une réaffectation ou une annulation, missions et agents sont relus aussitôt */}
+                {missions.donnees && (
+                    <FileMissions missions={liste} typesNoeuds={typesNoeuds}
+                        agents={agents.donnees ?? []} onAction={toutRecharger} />
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                     <AgentsTerrain agents={agents.donnees} erreur={agents.erreur} />
