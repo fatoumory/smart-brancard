@@ -7,6 +7,9 @@ import { useDonnees } from "../hooks/useDonnees";
 import { getHistorique, getMission } from "../services/missionService";
 import { formaterHeure } from "../services/referentiel";
 
+// Le suivi est relu toutes les 10 s pour voir avancer la mission, en attendant les WebSockets (Sprint 4)
+const INTERVALLE_MS = 10000;
+
 // Les 4 étapes vues par le médecin (maquette "Suivi de la demande").
 // Chaque étape est atteinte avec un statut de mission ; son heure vient du journal d'audit.
 const ETAPES = [
@@ -31,7 +34,7 @@ function SuiviDemande() {
     const { id } = useParams();
     // Mission et journal d'audit sont chargés ensemble, pour rester cohérents
     const chargeur = useCallback(() => Promise.all([getMission(id), getHistorique(id)]), [id]);
-    const { donnees, erreur, chargement, recharger } = useDonnees(chargeur);
+    const { donnees, erreur, chargement, recharger } = useDonnees(chargeur, INTERVALLE_MS);
     const [mission, historique] = donnees ?? [];
 
     // Heure à laquelle la mission est passée pour la première fois dans un des statuts de l'étape
