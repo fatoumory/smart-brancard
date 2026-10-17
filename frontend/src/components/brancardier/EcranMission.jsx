@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Bell, ChevronDown,CircleAlert, CircleCheck, Clock, Coffee, Moon, Navigation, UtensilsCrossed } from "lucide-react";
+import MissionProposee from "./MissionProposee";
+
 
 // À la fin d'une pause, le serveur remet l'agent disponible (sa tâche de fond passe toutes les 5 s) :
 // on relit le profil un peu après, pour afficher le nouveau statut
@@ -22,9 +24,8 @@ function optionsPause() {
             { libelle: "Pause courte", minutes: 15, icone: Coffee }];
 }
 
-// Onglet « Mission » : ce que voit l'agent selon son statut.
-// La réception d'une mission (accepter / refuser) arrive avec les routes de mission du Sprint 3.
-function EcranMission({ moi, changerStatut, envoi, rechargerProfil }) {
+// Onglet « Mission » : la mission en cours si l'agent en a une, sinon ce que voit l'agent selon son statut.
+function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onAccepter, onRefuser }) {
     const [choixPause, setChoixPause] = useState(false);
 
     // La durée choisie est envoyée au serveur, qui calcule l'heure de fin (fin_pause)
@@ -37,6 +38,29 @@ function EcranMission({ moi, changerStatut, envoi, rechargerProfil }) {
     function reprendre() {
         changerStatut("DISPONIBLE");
     }
+
+    // Mission proposée : passe avant le statut (l'agent est déjà « En mission » pendant la proposition).
+    // key : un nouvel écran (motif remis à zéro) pour chaque nouvelle mission proposée
+    if (mission?.statut === "PROPOSE") {
+        return <MissionProposee key={mission.id} mission={mission} envoi={envoi}
+            onAccepter={onAccepter} onRefuser={onRefuser} />;
+    }
+
+    // Mission acceptée ou en transit : les étapes du trajet (scans) arrivent dans la tâche suivante
+    if (mission?.statut === "ACCEPTE") {
+        return (
+            <Etat icone={Navigation} couleur="text-indigo-700" fond="bg-indigo-50" titre="Mission acceptée"
+                texte={`Rejoignez le patient ${mission.patient_nom} ${mission.patient_prenom} : ${mission.noeud_source_nom}.`} />
+        );
+    }
+    
+    if (mission?.statut === "EN_TRANSIT") {
+        return (
+            <Etat icone={Navigation} couleur="text-primaire" fond="bg-primaire-clair" titre="Patient en transit"
+                texte={`Destination : ${mission.noeud_destination_nom}.`} />
+        );
+    }
+
 
     if (moi.statut === "EN_PAUSE") {
         return <EnPause finPause={moi.fin_pause} onReprendre={reprendre} onFin={rechargerProfil} envoi={envoi} />;

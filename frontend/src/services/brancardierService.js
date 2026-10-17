@@ -18,3 +18,22 @@ export function changerMonStatut(statut, dureePauseMinutes) {
     });
 }
 
+
+/** Mission du brancardier connecté : proposée, acceptée ou en transit ; null s'il n'en a pas.
+ *  Format : MissionOut (backend/schemas/mission.py), avec fin_reponse pour une mission proposée */
+export function getMaMission() {
+    return apiFetch("/missions/moi");
+}
+
+/** Accepte la mission proposée : elle passe ACCEPTE, l'agent rejoint le point de départ */
+export function accepterMission(id) {
+    return apiFetch(`/missions/${id}/accept`, { method: "PUT" });
+}
+
+/** Refuse la mission proposée avec un motif obligatoire (clé de MOTIFS_REFUS) :
+ *  elle repart vers un autre agent ou, pour du matériel défectueux, vers le régulateur */
+export function refuserMission(id, motif) {
+    return apiFetch(`/missions/${id}/refuse`, { method: "PUT", json: { motif } });
+}
+
+

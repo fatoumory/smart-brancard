@@ -4,11 +4,14 @@ import EcranMission from "../components/brancardier/EcranMission";
 import EcranJournal from "../components/brancardier/EcranJournal";
 import EcranProfil from "../components/brancardier/EcranProfil";
 import { useDonnees } from "../hooks/useDonnees";
-import { changerMonStatut, getMonProfil } from "../services/brancardierService";
+import { accepterMission, changerMonStatut, getMaMission, getMonProfil, refuserMission } from "../services/brancardierService";
 import { STATUTS_AGENT } from "../services/referentiel";
 
 // Le profil (statut, missions du jour) est relu toutes les 30 s, en attendant les WebSockets du Sprint 4
 const INTERVALLE_MS = 30000;
+// La mission est relue plus souvent : une proposition n'attend la réponse que 30 à 60 s
+const INTERVALLE_MISSION_MS = 5000;
+
 
 // Barre de navigation du bas (maquette : Mission, Journal, Profil)
 const ONGLETS = [
@@ -25,6 +28,8 @@ function Brancardier() {
     const profil = useDonnees(getMonProfil, INTERVALLE_MS);
     const moi = profil.donnees;
     const statut = moi && STATUTS_AGENT[moi.statut];
+    // Mission proposée, acceptée ou en transit (null si l'agent n'en a pas)
+    const mission = useDonnees(getMaMission, INTERVALLE_MISSION_MS);
 
     // Change le statut sur le serveur, puis relit le profil pour afficher le nouvel état.
     // dureePauseMinutes n'est envoyé que pour une pause (15 ou 45 min) : le serveur en déduit l'heure de fin. Renvoie true si le changement a réussi
@@ -43,8 +48,26 @@ function Brancardier() {
         }
     }
 
+    // Réponse à une mission proposée (accepter ou refuser).
+    // Dans tous les cas, mission et profil sont relus : même en cas d'erreur (ex : délai de réponse
+    // dépassé, « Cette mission n'attend plus de réponse »), l'écran se remet à jour.
+    async function repondre(appel) {
+        setErreurStatut("");
+        setEnvoi(true);
+        try {
+            await appel();
+        } catch (err) {
+            setErreurStatut(err.message);
+        } finally {
+            setEnvoi(false);
+            mission.recharger();
+            profil.recharger();
+        }
+    }
+
     const titre = ONGLETS.find((o) => o.id === onglet).titre;
-    const erreur = erreurStatut || profil.erreur;
+    const erreur = erreurStatut || profil.erreur || mission.erreur;
+
 
     return (
         <div className="min-h-screen max-w-md mx-auto bg-slate-50 flex flex-col">
@@ -69,7 +92,12 @@ function Brancardier() {
                 )}
                 {!moi && profil.chargement && <p className="text-center text-slate-500 py-10">Chargement…</p>}
 
-                {moi && onglet === "mission" && <EcranMission moi={moi} changerStatut={changerStatut} envoi={envoi} rechargerProfil={profil.recharger} />}
+                {moi && onglet === "mission" && (
+                    <EcranMission moi={moi} mission={mission.donnees} changerStatut={changerStatut} envoi={envoi}
+                        rechargerProfil={profil.recharger}
+                        onAccepter={() => repondre(() => accepterMission(mission.donnees.id))}
+                        onRefuser={(motif) => repondre(() => refuserMission(mission.donnees.id, motif))} />
+                )}
                 {moi && onglet === "journal" && <EcranJournal />}
                 {moi && onglet === "profil" && <EcranProfil moi={moi} />}
             </main>
