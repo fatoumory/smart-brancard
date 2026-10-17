@@ -1,20 +1,43 @@
 import { Fragment, useState } from "react";
-import { Activity, ArrowRight, ChevronDown, Route } from "lucide-react";
+import { Activity, ArrowRight, Ban, ChevronDown, MoreHorizontal, Route, TriangleAlert, UserRoundCog, UserX, Zap } from "lucide-react";
 import { BadgeStatut, BadgeUrgence, Materiel } from "../Badges";
+import ActionRegulation from "./ActionRegulation";
 import { STATUTS_MISSION, URGENCES, formaterHeure, trierParPriorite } from "../../services/referentiel";
 
 const selectClasse = "px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 cursor-pointer";
 
+// Le régulateur peut réaffecter ou annuler tant que le patient n'est pas en transport
+// (même règle que le backend : services/regulation_service.py)
+const STATUTS_MODIFIABLES = ["EN_ATTENTE", "PROPOSE", "ACCEPTE"];
+
 // Tableau des missions, trié par urgence puis ancienneté.
-// Un clic sur une ligne affiche l'itinéraire calculé, étape par étape.
-// agentsParId : { id: brancardier } pour afficher le nom de l'agent assigné
+// Un clic sur une ligne (ou sur « ⋯ ») affiche l'itinéraire et les actions du régulateur.
 // typesNoeuds : { id: type_noeud } pour distinguer les ascenseurs dans l'itinéraire
-function FileMissions({ missions, agentsParId, typesNoeuds }) {
+// agents : brancardiers (pour la réaffectation) ; onAction : appelé après une action réussie
+// (le nom de l'agent est fourni par le backend dans chaque mission : brancardier_prenom / _nom)
+function FileMissions({ missions, typesNoeuds, agents, onAction }) {
     const [filtreUrgence, setFiltreUrgence] = useState("");
     const [filtreStatut, setFiltreStatut] = useState("");
     const [ouverte, setOuverte] = useState(null);
+    // Action en cours dans la ligne ouverte : "reaffecter", "annuler" ou null
+    const [action, setAction] = useState(null);
+
+    // Ouvre ou ferme le détail d'une mission ; une action commencée est abandonnée
+    function basculer(id) {
+        setOuverte(ouverte === id ? null : id);
+        setAction(null);
+    }
+
+    // Action réussie : on referme le détail et le dashboard relit missions et agents
+    function actionFaite() {
+        setOuverte(null);
+        setAction(null);
+        onAction();
+    }
 
     const aTraiter = missions.filter((m) => m.statut === "EN_ATTENTE" || m.statut === "PROPOSE").length;
+    // Missions qu'aucun agent ne peut recevoir pour l'instant : le régulateur doit intervenir
+    const sansCandidat = missions.filter((m) => m.sans_candidat).length;
     const visibles = trierParPriorite(missions).filter((m) =>
         (!filtreUrgence || m.niveau_urgence === filtreUrgence) && (!filtreStatut || m.statut === filtreStatut));
 
@@ -46,6 +69,21 @@ function FileMissions({ missions, agentsParId, typesNoeuds }) {
                 </div>
             </div>
 
+            {/* Bandeau d'alerte : visible même si la mission est plus bas dans la liste */}
+            {sansCandidat > 0 && (
+                <p role="alert" className="mx-5 mb-4 p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-800 text-sm flex items-start gap-2">
+                    <UserX className="w-5 h-5 shrink-0" />
+                    <span>
+                        <span className="font-semibold">
+                            {sansCandidat} mission{sansCandidat > 1 ? "s" : ""} sans candidat :
+                        </span>{" "}
+                        aucun agent ne peut {sansCandidat > 1 ? "les" : "la"} recevoir pour l'instant.
+                        Réaffectez avec le menu « ⋯ », ou attendez la nouvelle proposition automatique
+                        (5 min après le dernier refus ou la dernière non-réponse).
+                    </span>
+                </p>
+            )}
+
             <div className="overflow-x-auto">
                 <table className="w-full text-left min-w-[900px]">
                     <thead className="bg-slate-50 border-y border-slate-200">
@@ -58,13 +96,14 @@ function FileMissions({ missions, agentsParId, typesNoeuds }) {
                             <th className="px-4 py-3">Agent assigné</th>
                             <th className="px-4 py-3">Statut</th>
                             <th className="px-4 py-3">Heure</th>
+                            <th className="px-2 py-3"><span className="sr-only">Actions</span></th>
                             <th className="px-2 py-3"><span className="sr-only">Itinéraire</span></th>
                         </tr>
                     </thead>
                     <tbody>
                         {visibles.length === 0 && (
                             <tr>
-                                <td colSpan={9} className="px-4 py-10 text-center text-slate-500">
+                                <td colSpan={10} className="px-4 py-10 text-center text-slate-500">
                                     Aucune mission ne correspond à ces filtres.
                                 </td>
                             </tr>
@@ -72,9 +111,11 @@ function FileMissions({ missions, agentsParId, typesNoeuds }) {
                         {visibles.map((m) => (
                             <Fragment key={m.id}>
                                 <tr
-                                    onClick={() => setOuverte(ouverte === m.id ? null : m.id)}
+                                    onClick={() => basculer(m.id)}
                                     className={`border-b border-slate-100 cursor-pointer hover:bg-slate-50 ${
-                                        m.niveau_urgence === "URGENT" && m.statut !== "TERMINE" && m.statut !== "ANNULE" ? "bg-red-50/60" : ""}`}
+                                        m.alerte_materiel ? "bg-amber-50"
+                                            : m.sans_candidat ? "bg-orange-50"
+                                            : m.niveau_urgence === "URGENT" && m.statut !== "TERMINE" && m.statut !== "ANNULE" ? "bg-red-50/60" : ""}`}
                                 >
                                     <td className="px-4 py-4 font-mono text-sm text-slate-500">#{m.id}</td>
                                     <td className="px-4 py-4">
@@ -90,16 +131,65 @@ function FileMissions({ missions, agentsParId, typesNoeuds }) {
                                         </span>
                                     </td>
                                     <td className="px-4 py-4"><Materiel code={m.materiel_requis} /></td>
-                                    <td className="px-4 py-4 text-sm"><Agent id={m.brancardier_id} agentsParId={agentsParId} /></td>
-                                    <td className="px-4 py-4"><BadgeStatut statut={m.statut} /></td>
+                                    <td className="px-4 py-4 text-sm"><Agent mission={m} /></td>
+                                    <td className="px-4 py-4">
+                                        <BadgeStatut statut={m.statut} />
+                                        {/* Mission bloquée : plus proposée automatiquement, en attente d'une décision */}
+                                        {m.alerte_materiel && (
+                                            <span className="mt-1 flex items-center gap-1 text-xs font-semibold text-amber-700"
+                                                title="Refusée pour matériel défectueux : à réaffecter ou annuler">
+                                                <TriangleAlert className="w-3.5 h-3.5" /> Matériel défectueux
+                                            </span>
+                                        )}
+
+                                        {/* Aucun agent ne peut la recevoir pour l'instant : tous l'ont refusée ou
+                                            laissée sans réponse il y a moins de 5 min, ou aucun brancardier n'est actif */}
+                                        {m.sans_candidat && (
+                                            <span className="mt-1 flex items-center gap-1 text-xs font-semibold text-orange-700"
+                                                title="Tous les agents l'ont refusée ou laissée sans réponse récemment : à réaffecter ou annuler">
+                                                <UserX className="w-3.5 h-3.5" /> Sans candidat
+                                            </span>
+                                        )}
+                                    </td>                                    
                                     <td className="px-4 py-4 font-mono text-sm text-slate-600">{formaterHeure(m.date_creation)}</td>
+                                    {/* Menu « ⋯ » : seulement si la mission peut encore être modifiée */}
+                                    <td className="px-2 py-4">
+                                        {STATUTS_MODIFIABLES.includes(m.statut) && (
+                                            <button type="button" title="Réaffecter ou annuler" aria-label={`Actions sur la mission ${m.id}`}
+                                                onClick={(e) => {
+                                                    // Sans stopPropagation, le clic refermerait aussi la ligne
+                                                    e.stopPropagation();
+                                                    setOuverte(m.id);
+                                                    setAction(null);
+                                                }}
+                                                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-200 cursor-pointer">
+                                                <MoreHorizontal className="w-5 h-5" />
+                                            </button>
+                                        )}
+                                    </td>
                                     <td className="px-2 py-4">
                                         <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${ouverte === m.id ? "rotate-180" : ""}`} />
                                     </td>
                                 </tr>
                                 {ouverte === m.id && (
                                     <tr className="bg-slate-50 border-b border-slate-200">
-                                        <td colSpan={9} className="px-4 py-4">
+                                        <td colSpan={10} className="px-4 py-4 space-y-3">
+                                            {/* Actions du régulateur : d'abord le choix, puis le panneau de l'action */}
+                                            {STATUTS_MODIFIABLES.includes(m.statut) && (action ? (
+                                                <ActionRegulation type={action} mission={m} agents={agents}
+                                                    onFait={actionFaite} onFermer={() => setAction(null)} />
+                                            ) : (
+                                                <div className="flex flex-wrap gap-2">
+                                                    <button type="button" onClick={() => setAction("reaffecter")}
+                                                        className="px-3 py-2 rounded-lg bg-white border border-slate-200 text-sm font-semibold text-slate-700 flex items-center gap-2 hover:bg-slate-100 cursor-pointer">
+                                                        <UserRoundCog className="w-4 h-4 text-primaire" /> Réaffecter
+                                                    </button>
+                                                    <button type="button" onClick={() => setAction("annuler")}
+                                                        className="px-3 py-2 rounded-lg bg-white border border-red-200 text-sm font-semibold text-red-700 flex items-center gap-2 hover:bg-red-50 cursor-pointer">
+                                                        <Ban className="w-4 h-4" /> Annuler la mission
+                                                    </button>
+                                                </div>
+                                            ))}
                                             <Itineraire mission={m} typesNoeuds={typesNoeuds} />
                                             {m.consigne && (
                                                 <p className="text-sm text-slate-600 mt-3">
@@ -118,15 +208,25 @@ function FileMissions({ missions, agentsParId, typesNoeuds }) {
     );
 }
 
-function Agent({ id, agentsParId }) {
-    if (id === null) return <span className="text-slate-400">—</span>;
-    const agent = agentsParId[id];
+// Agent de la mission : « A. Cissé », avec le badge « Auto » s'il a été choisi par l'algorithme
+function Agent({ mission }) {
+    if (mission.brancardier_id === null) return <span className="text-slate-400">—</span>;
+    const nom = mission.brancardier_nom
+        ? `${mission.brancardier_prenom?.[0] ?? ""}. ${mission.brancardier_nom}`
+        : `Agent #${mission.brancardier_id}`;
     return (
-        <span className="font-medium text-slate-900">
-            {agent ? `${agent.prenom[0]}. ${agent.nom}` : `Agent #${id}`}
+        <span className="flex flex-col items-start gap-1">
+            <span className="font-medium text-slate-900">{nom}</span>
+            {/* assignation_auto : false si le régulateur l'a choisi à la main (réaffectation) */}
+            {mission.assignation_auto && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primaire-clair text-primaire text-xs font-semibold">
+                    <Zap className="w-3 h-3" /> Auto
+                </span>
+            )}
         </span>
     );
 }
+
 
 // Liste d'étapes de l'itinéraire : "Urgences → Ascenseur A - RDC → ... → Réanimation"
 function Itineraire({ mission, typesNoeuds }) {

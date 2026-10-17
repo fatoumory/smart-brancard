@@ -44,3 +44,14 @@ export function rechercherPatients(texte) {
 export function listerBrancardiers() {
   return apiFetch("/utilisateurs?role=BRANCARDIER");
 }
+
+/** Régulateur : propose la mission au brancardier choisi (il doit être DISPONIBLE et devra accepter).
+ *  Possible tant que le patient n'est pas en transport ; l'agent sollicité avant est libéré. */
+export function reaffecterMission(id, brancardierId) {
+  return apiFetch(`/missions/${id}/reaffecter`, { method: "PUT", json: { brancardier_id: brancardierId } });
+}
+
+/** Régulateur : annule la mission (statut ANNULE, gardée dans le journal) ; l'agent sollicité est libéré */
+export function annulerMission(id) {
+  return apiFetch(`/missions/${id}/annuler`, { method: "PUT" });
+}

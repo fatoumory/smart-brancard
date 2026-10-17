@@ -3,6 +3,9 @@ const COULEURS = {
     bleu: { chiffre: "text-primaire", fond: "bg-primaire-clair", icone: "text-primaire" },
     orange: { chiffre: "text-orange-600", fond: "bg-orange-50", icone: "text-orange-600" },
     vert: { chiffre: "text-emerald-700", fond: "bg-emerald-50", icone: "text-emerald-700" },
+    // Missions acceptées, brancardier en route : même teinte que le badge « Accepté »
+    indigo: { chiffre: "text-indigo-700", fond: "bg-indigo-50", icone: "text-indigo-700" },
+
 };
 
 function CarteIndicateur({ titre, valeur, detail, icone: Icone, couleur }) {

@@ -26,6 +26,19 @@ export const STATUTS_MISSION = {
   ANNULE: { libelle: "Annulé", classe: "bg-red-50 text-red-600" },
 };
 
+// Motifs de refus d'une mission (énumération MotifRefus du backend).
+// consequence : ce que le serveur fait du brancardier après ce refus (services/assignation_service.py)
+export const MOTIFS_REFUS = {
+  MATERIEL_DEFECTUEUX: { libelle: "Matériel défectueux",
+    consequence: "Vous restez disponible : la régulation décide de la suite de la mission." },
+  INDISPONIBILITE_PHYSIQUE: { libelle: "Indisponibilité physique",
+    consequence: "Vous passez indisponible." },
+  URGENCE_PRIORITAIRE: { libelle: "Urgence vitale prioritaire sur place",
+    consequence: "Vous passez en pause pendant 15 min." },
+  FIN_SERVICE: { libelle: "Fin de service imminente",
+    consequence: "Vous passez indisponible." },
+};
+
 // Statuts d'un brancardier
 export const STATUTS_AGENT = {
   DISPONIBLE: { libelle: "Disponible", point: "bg-emerald-600", texte: "text-emerald-700" },

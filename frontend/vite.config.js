@@ -2,12 +2,26 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 
 // https://vite.dev/config/
-export default defineConfig({
+// Mode « mobile » (npm run dev:mobile) : test sur un vrai téléphone du même réseau Wi-Fi.
+// La caméra et Web NFC n'y fonctionnent qu'en HTTPS : certificat auto-signé + proxy vers l'API,
+// pour que le téléphone appelle l'API à la même adresse (pas de CORS, pas de contenu HTTP bloqué).
+export default defineConfig(({ mode }) => ({
+  server: mode === 'mobile' ? {
+    host: true,   // accessible depuis le téléphone (adresse IP du PC)
+    proxy: {
+      // https://<IP du PC>:5173/api/missions  ->  http://localhost:8000/missions
+      '/api': { target: 'http://localhost:8000', changeOrigin: true, rewrite: (chemin) => chemin.replace(/^\/api/, '') },
+    },
+  } : undefined,
+
   plugins: [
     react(),
     tailwindcss(),
+    // Certificat HTTPS auto-signé, seulement en mode mobile
+    mode === 'mobile' && basicSsl(),
 
     // PWA : rend l'application installable sur smartphone et PC, sans passer par un store
     VitePWA({
@@ -47,4 +61,4 @@ export default defineConfig({
       },
     }),
   ],
-})
+}))
