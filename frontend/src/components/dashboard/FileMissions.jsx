@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { Activity, ArrowRight, Ban, ChevronDown, MoreHorizontal, Route, TriangleAlert, UserRoundCog, Zap } from "lucide-react";
+import { Activity, ArrowRight, Ban, ChevronDown, MoreHorizontal, Route, TriangleAlert, UserRoundCog, UserX, Zap } from "lucide-react";
 import { BadgeStatut, BadgeUrgence, Materiel } from "../Badges";
 import ActionRegulation from "./ActionRegulation";
 import { STATUTS_MISSION, URGENCES, formaterHeure, trierParPriorite } from "../../services/referentiel";
@@ -36,6 +36,8 @@ function FileMissions({ missions, typesNoeuds, agents, onAction }) {
     }
 
     const aTraiter = missions.filter((m) => m.statut === "EN_ATTENTE" || m.statut === "PROPOSE").length;
+    // Missions qu'aucun agent ne peut recevoir pour l'instant : le régulateur doit intervenir
+    const sansCandidat = missions.filter((m) => m.sans_candidat).length;
     const visibles = trierParPriorite(missions).filter((m) =>
         (!filtreUrgence || m.niveau_urgence === filtreUrgence) && (!filtreStatut || m.statut === filtreStatut));
 
@@ -67,6 +69,21 @@ function FileMissions({ missions, typesNoeuds, agents, onAction }) {
                 </div>
             </div>
 
+            {/* Bandeau d'alerte : visible même si la mission est plus bas dans la liste */}
+            {sansCandidat > 0 && (
+                <p role="alert" className="mx-5 mb-4 p-3 rounded-xl bg-orange-50 border border-orange-200 text-orange-800 text-sm flex items-start gap-2">
+                    <UserX className="w-5 h-5 shrink-0" />
+                    <span>
+                        <span className="font-semibold">
+                            {sansCandidat} mission{sansCandidat > 1 ? "s" : ""} sans candidat :
+                        </span>{" "}
+                        aucun agent ne peut {sansCandidat > 1 ? "les" : "la"} recevoir pour l'instant.
+                        Réaffectez avec le menu « ⋯ », ou attendez la nouvelle proposition automatique
+                        (5 min après le dernier refus ou la dernière non-réponse).
+                    </span>
+                </p>
+            )}
+
             <div className="overflow-x-auto">
                 <table className="w-full text-left min-w-[900px]">
                     <thead className="bg-slate-50 border-y border-slate-200">
@@ -97,6 +114,7 @@ function FileMissions({ missions, typesNoeuds, agents, onAction }) {
                                     onClick={() => basculer(m.id)}
                                     className={`border-b border-slate-100 cursor-pointer hover:bg-slate-50 ${
                                         m.alerte_materiel ? "bg-amber-50"
+                                            : m.sans_candidat ? "bg-orange-50"
                                             : m.niveau_urgence === "URGENT" && m.statut !== "TERMINE" && m.statut !== "ANNULE" ? "bg-red-50/60" : ""}`}
                                 >
                                     <td className="px-4 py-4 font-mono text-sm text-slate-500">#{m.id}</td>
@@ -121,6 +139,15 @@ function FileMissions({ missions, typesNoeuds, agents, onAction }) {
                                             <span className="mt-1 flex items-center gap-1 text-xs font-semibold text-amber-700"
                                                 title="Refusée pour matériel défectueux : à réaffecter ou annuler">
                                                 <TriangleAlert className="w-3.5 h-3.5" /> Matériel défectueux
+                                            </span>
+                                        )}
+
+                                        {/* Aucun agent ne peut la recevoir pour l'instant : tous l'ont refusée ou
+                                            laissée sans réponse il y a moins de 5 min, ou aucun brancardier n'est actif */}
+                                        {m.sans_candidat && (
+                                            <span className="mt-1 flex items-center gap-1 text-xs font-semibold text-orange-700"
+                                                title="Tous les agents l'ont refusée ou laissée sans réponse récemment : à réaffecter ou annuler">
+                                                <UserX className="w-3.5 h-3.5" /> Sans candidat
                                             </span>
                                         )}
                                     </td>                                    
