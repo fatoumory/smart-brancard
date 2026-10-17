@@ -4,7 +4,8 @@ import EcranMission from "../components/brancardier/EcranMission";
 import EcranJournal from "../components/brancardier/EcranJournal";
 import EcranProfil from "../components/brancardier/EcranProfil";
 import { useDonnees } from "../hooks/useDonnees";
-import { accepterMission, changerMonStatut, getMaMission, getMonProfil, refuserMission } from "../services/brancardierService";
+import { MissionTerminee } from "../components/brancardier/MissionEnCours";
+import { accepterMission, changerMonStatut, getMaMission, getMonProfil, refuserMission, scannerArrivee, scannerDepart } from "../services/brancardierService";
 import { STATUTS_AGENT } from "../services/referentiel";
 
 // Le profil (statut, missions du jour) est relu toutes les 30 s, en attendant les WebSockets du Sprint 4
@@ -30,6 +31,9 @@ function Brancardier() {
     const statut = moi && STATUTS_AGENT[moi.statut];
     // Mission proposée, acceptée ou en transit (null si l'agent n'en a pas)
     const mission = useDonnees(getMaMission, INTERVALLE_MISSION_MS);
+    // Mission que l'agent vient de terminer (scan d'arrivée réussi) : confirmation affichée jusqu'à fermeture
+    const [missionTerminee, setMissionTerminee] = useState(null);
+
 
     // Change le statut sur le serveur, puis relit le profil pour afficher le nouvel état.
     // dureePauseMinutes n'est envoyé que pour une pause (15 ou 45 min) : le serveur en déduit l'heure de fin. Renvoie true si le changement a réussi
@@ -65,6 +69,24 @@ function Brancardier() {
         }
     }
 
+
+    // Scan de départ ou d'arrivée. Pas de catch ici : une erreur (tag ou bracelet qui ne correspond pas)
+    // remonte au formulaire du scan, qui l'affiche sous les champs. Dans tous les cas, mission et profil sont relus.
+    async function scanner(appel) {
+        try {
+            return await appel();
+        } finally {
+            mission.recharger();
+            profil.recharger();
+        }
+    }
+
+    // Scan d'arrivée réussi : le serveur renvoie la mission TERMINE, gardée pour la confirmation
+    async function terminerMission(tagNfc) {
+        const terminee = await scanner(() => scannerArrivee(mission.donnees.id, tagNfc));
+        setMissionTerminee(terminee);
+    }
+
     const titre = ONGLETS.find((o) => o.id === onglet).titre;
     const erreur = erreurStatut || profil.erreur || mission.erreur;
 
@@ -92,12 +114,20 @@ function Brancardier() {
                 )}
                 {!moi && profil.chargement && <p className="text-center text-slate-500 py-10">Chargement…</p>}
 
+                {/* Étape « Terminé » du parcours : au-dessus de l'écran suivant (attente ou nouvelle mission) */}
+                {missionTerminee && onglet === "mission" && (
+                    <MissionTerminee mission={missionTerminee} onFermer={() => setMissionTerminee(null)} />
+                )}
+
                 {moi && onglet === "mission" && (
                     <EcranMission moi={moi} mission={mission.donnees} changerStatut={changerStatut} envoi={envoi}
                         rechargerProfil={profil.recharger}
                         onAccepter={() => repondre(() => accepterMission(mission.donnees.id))}
-                        onRefuser={(motif) => repondre(() => refuserMission(mission.donnees.id, motif))} />
+                        onRefuser={(motif) => repondre(() => refuserMission(mission.donnees.id, motif))}
+                        onScanDepart={(corps) => scanner(() => scannerDepart(mission.donnees.id, corps))}
+                        onScanArrivee={terminerMission} />
                 )}
+
                 {moi && onglet === "journal" && <EcranJournal />}
                 {moi && onglet === "profil" && <EcranProfil moi={moi} />}
             </main>

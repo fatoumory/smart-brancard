@@ -36,4 +36,16 @@ export function refuserMission(id, motif) {
     return apiFetch(`/missions/${id}/refuse`, { method: "PUT", json: { motif } });
 }
 
+/** Prise en charge au point de départ -> la mission passe EN_TRANSIT.
+ *  corps : { tag_nfc, code_bracelet } (tag de la salle + QR du bracelet du patient),
+ *  ou { forcer_urgence: true } pour partir sans scan, réservé aux missions URGENT (tracé dans le journal) */
+export function scannerDepart(id, corps) {
+    return apiFetch(`/missions/${id}/scan-depart`, { method: "POST", json: corps });
+}
+
+/** Arrivée : tag NFC de la salle de destination -> la mission passe TERMINE, l'agent redevient disponible */
+export function scannerArrivee(id, tagNfc) {
+    return apiFetch(`/missions/${id}/scan-arrivee`, { method: "POST", json: { tag_nfc: tagNfc } });
+}
+
 

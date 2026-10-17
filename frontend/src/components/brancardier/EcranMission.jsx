@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Bell, ChevronDown,CircleAlert, CircleCheck, Clock, Coffee, Moon, Navigation, UtensilsCrossed } from "lucide-react";
 import MissionProposee from "./MissionProposee";
+import MissionEnCours from "./MissionEnCours";
 
 
 // À la fin d'une pause, le serveur remet l'agent disponible (sa tâche de fond passe toutes les 5 s) :
@@ -25,7 +26,7 @@ function optionsPause() {
 }
 
 // Onglet « Mission » : la mission en cours si l'agent en a une, sinon ce que voit l'agent selon son statut.
-function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onAccepter, onRefuser }) {
+function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onAccepter, onRefuser, onScanDepart, onScanArrivee }) {
     const [choixPause, setChoixPause] = useState(false);
 
     // La durée choisie est envoyée au serveur, qui calcule l'heure de fin (fin_pause)
@@ -46,19 +47,10 @@ function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onA
             onAccepter={onAccepter} onRefuser={onRefuser} />;
     }
 
-    // Mission acceptée ou en transit : les étapes du trajet (scans) arrivent dans la tâche suivante
-    if (mission?.statut === "ACCEPTE") {
-        return (
-            <Etat icone={Navigation} couleur="text-indigo-700" fond="bg-indigo-50" titre="Mission acceptée"
-                texte={`Rejoignez le patient ${mission.patient_nom} ${mission.patient_prenom} : ${mission.noeud_source_nom}.`} />
-        );
-    }
-    
-    if (mission?.statut === "EN_TRANSIT") {
-        return (
-            <Etat icone={Navigation} couleur="text-primaire" fond="bg-primaire-clair" titre="Patient en transit"
-                texte={`Destination : ${mission.noeud_destination_nom}.`} />
-        );
+    // Mission acceptée (en route vers le patient) ou en transit : parcours et scans de la mission
+    if (mission?.statut === "ACCEPTE" || mission?.statut === "EN_TRANSIT") {
+        return <MissionEnCours key={mission.id} mission={mission}
+            onScanDepart={onScanDepart} onScanArrivee={onScanArrivee} />;
     }
 
 
