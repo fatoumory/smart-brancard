@@ -28,9 +28,7 @@ function AgentsTerrain({ agents, erreur }) {
                         <li key={agent.id} className="flex items-center justify-between px-5 py-4">
                             <div>
                                 <p className="font-medium text-slate-900">{agent.prenom} {agent.nom}</p>
-                                <p className="flex items-center gap-1 text-sm text-slate-500">
-                                    <Position agent={agent} />
-                                </p>
+                                <Position agent={agent} />
                             </div>
                             <div className="text-right">
                                 <p className={`flex items-center justify-end gap-2 font-medium ${statut.texte}`}>
