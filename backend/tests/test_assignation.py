@@ -193,3 +193,19 @@ def test_l_agent_ne_choisit_pas_son_statut_pendant_une_mission(client, reg, mede
     demande(client, medecin)  # la mission lui est proposée
     r = client.patch("/utilisateurs/me/statut", json={"statut": "EN_PAUSE"}, headers=entetes)
     assert r.status_code == 409
+
+
+def test_nouveau_brancardier_recoit_la_file_d_attente(client, reg, medecin):
+    # Des missions attendent, personne n'est encore inscrit
+    m = demande(client, medecin)
+    assert m["statut"] == "EN_ATTENTE"
+    # Le régulateur crée un compte brancardier : disponible d'office, il reçoit aussitôt la mission
+    nouveau = client.post("/auth/register", json=agent_donnees("nouveau"), headers=reg).json()
+    assert nouveau["statut"] == "EN_MISSION"
+    assert client.get(f"/missions/{m['id']}", headers=medecin).json()["brancardier_id"] == nouveau["id"]
+
+
+def test_creation_d_un_medecin_ne_touche_pas_la_file(client, reg, medecin):
+    m = demande(client, medecin)
+    client.post("/auth/register", headers=reg, json={**MEDECIN, "nom_utilisateur": "sow@test.fr"})
+    assert client.get(f"/missions/{m['id']}", headers=medecin).json()["statut"] == "EN_ATTENTE"

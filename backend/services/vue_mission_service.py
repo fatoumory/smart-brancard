@@ -19,7 +19,7 @@ from models.noeud_hopital import NoeudHopital
 from models.patient import Patient
 from models.utilisateur import Brancardier
 from schemas.mission import MissionOut
-from services.assignation_service import DELAIS_REPONSE
+from services.assignation_service import DELAIS_REPONSE, exclus_parmi
 from services.graphe_service import construire_graphe
 from services.position_service import en_utc, positions_actuelles
 
@@ -41,6 +41,8 @@ def construire_missions_out(db: Session, missions: list[Mission]) -> list[Missio
     agents = {a.id: a for a in db.query(Brancardier).filter(Brancardier.id.in_(ids_agents))}
     # Positions de moins de 10 min seulement : une position périmée fausserait l'arrivée estimée
     positions = positions_actuelles(db, list(ids_agents), recentes_seulement=True) if ids_agents else {}
+    # Brancardiers actifs, quel que soit leur statut : ceux qui pourraient un jour prendre une mission
+    actifs = {i for (i,) in db.query(Brancardier.id).filter(Brancardier.est_actif.is_(True))}
 
     journal = defaultdict(list)
     for ligne in (db.query(Historique).filter(Historique.mission_id.in_(ids))
@@ -93,6 +95,11 @@ def construire_missions_out(db: Session, missions: list[Mission]) -> list[Missio
         alerte_materiel = (m.statut == StatutMission.EN_ATTENTE and bool(lignes)
                            and lignes[-1].motif_refus == MotifRefus.MATERIEL_DEFECTUEUX)
 
+        # Aucun agent actif ne peut la recevoir en ce moment (tous l'ont refusée ou laissée sans
+        # réponse récemment, ou aucun brancardier n'existe) : le régulateur doit intervenir
+        sans_candidat = (m.statut == StatutMission.EN_ATTENTE and not alerte_materiel
+                         and not (actifs - exclus_parmi(lignes, maintenant)))
+
         # Agent : identité, position, et arrivée estimée au point de départ s'il est en approche
         agent = agents.get(m.brancardier_id)
         detection = positions.get(m.brancardier_id)
@@ -137,5 +144,6 @@ def construire_missions_out(db: Session, missions: list[Mission]) -> list[Missio
             date_fin=fin,
             dans_les_delais=dans_les_delais,
             alerte_materiel=alerte_materiel,
+            sans_candidat=sans_candidat,
         ))
     return resultat

@@ -116,4 +116,7 @@ class MissionOut(BaseModel):
     dans_les_delais: bool | None = None
     # Refusée pour matériel défectueux : n'est plus proposée automatiquement, le régulateur décide
     alerte_materiel: bool = False
+    # Aucun brancardier actif ne peut la recevoir en ce moment (tous exclus ou aucun agent) :
+    # alerte pour le régulateur, qui peut réaffecter sans attendre la fin des exclusions (5 min)
+    sans_candidat: bool = False
 
