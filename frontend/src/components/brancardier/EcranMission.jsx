@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, ChevronDown,CircleAlert, CircleCheck, Clock, Coffee, Moon, Navigation, UtensilsCrossed } from "lucide-react";
+import { Bell, ChevronDown,CircleAlert, CircleCheck, Clock, Coffee, LogOut, Moon, Navigation, UtensilsCrossed } from "lucide-react";
 import MissionProposee from "./MissionProposee";
 import MissionEnCours from "./MissionEnCours";
 
@@ -40,6 +40,14 @@ function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onA
         changerStatut("DISPONIBLE");
     }
 
+    // Fin de service, ou absence imprévue : l'agent ne reçoit plus de mission.
+    // Impossible pendant une mission : ces boutons ne sont affichés qu'en dehors d'une mission
+    // (le serveur le refuse aussi : « terminez-la ou refusez-la d'abord »).
+    function passerIndisponible() {
+        setChoixPause(false);
+        changerStatut("INDISPONIBLE");
+    }
+
     // Mission proposée : passe avant le statut (l'agent est déjà « En mission » pendant la proposition).
     // key : un nouvel écran (motif remis à zéro) pour chaque nouvelle mission proposée
     if (mission?.statut === "PROPOSE") {
@@ -55,7 +63,8 @@ function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onA
 
 
     if (moi.statut === "EN_PAUSE") {
-        return <EnPause finPause={moi.fin_pause} onReprendre={reprendre} onFin={rechargerProfil} envoi={envoi} />;
+        return <EnPause finPause={moi.fin_pause} onReprendre={reprendre} onFin={rechargerProfil}
+            onIndisponible={passerIndisponible} envoi={envoi} />;
     }
 
     if (moi.statut === "INDISPONIBLE") {
@@ -93,6 +102,7 @@ function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onA
             <ChoixPause ouvert={choixPause} envoi={envoi}
                 onChoisir={commencerPause} onAnnuler={() => setChoixPause(false)} />
 
+            <BoutonIndisponible onClick={passerIndisponible} envoi={envoi} />
         </Etat>
     );
 }
@@ -115,7 +125,7 @@ function Etat({ icone: Icone, couleur, fond, titre, texte, children }) {
 
 // Pause avec compte à rebours, calculé à partir de l'heure de fin donnée par le serveur (fin_pause).
 // À la fin, c'est le serveur qui remet l'agent disponible : le téléphone se contente de relire le profil.
-function EnPause({ finPause, onReprendre, onFin, envoi }) {
+function EnPause({ finPause, onReprendre, onFin, onIndisponible, envoi }) {
     const [maintenant, setMaintenant] = useState(() => Date.now());
     // Temps restant en millisecondes (null si le serveur n'a pas donné d'heure de fin)
     const restantMs = finPause ? Math.max(0, new Date(finPause).getTime() - maintenant) : null;
@@ -154,7 +164,20 @@ function EnPause({ finPause, onReprendre, onFin, envoi }) {
             <button type="button" onClick={onReprendre} disabled={envoi} className={boutonVert}>
                 <CircleCheck className="w-5 h-5" /> Reprendre le service
             </button>
+            {/* Ex : pause prise juste avant la fin de l'équipe ; sinon le serveur le remettrait disponible */}
+            <BoutonIndisponible onClick={onIndisponible} envoi={envoi} />
         </Etat>
+    );
+}
+
+// Bouton discret « fin de service » : moins visible que les actions principales,
+// pour ne pas être touché par erreur (on revient ensuite avec « Je suis de nouveau disponible »)
+function BoutonIndisponible({ onClick, envoi }) {
+    return (
+        <button type="button" onClick={onClick} disabled={envoi}
+            className="w-full h-12 rounded-2xl text-slate-500 font-medium flex items-center justify-center gap-2 cursor-pointer hover:bg-slate-100 disabled:opacity-60">
+            <LogOut className="w-5 h-5" /> Fin de service : me déclarer indisponible
+        </button>
     );
 }
 
