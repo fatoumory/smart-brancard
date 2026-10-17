@@ -6,7 +6,9 @@
 # k (« combien de minutes vaut une mission déjà faite ») équilibre la charge entre agents proches,
 # sans jamais envoyer un agent beaucoup plus loin. En URGENT, k = 0 : seule la distance compte.
 # Un agent sans position récente (aucune détection depuis 10 min) passe après les agents localisés.
-# Un agent qui a refusé la mission, ou l'a laissée sans réponse, n'est plus sollicité pour elle.
+# Un agent qui a refusé la mission, ou l'a laissée sans réponse, n'est plus sollicité pour elle
+# pendant 5 min ; ensuite, elle peut lui être reproposée (sinon, avec peu d'agents, elle resterait
+# bloquée indéfiniment). Pendant ce temps, le régulateur voit l'alerte « sans candidat ».
 #
 # Verrouillage : la mission et les agents candidats sont verrouillés en base (SELECT ... FOR UPDATE)
 # pendant le choix, et un index unique interdit à un agent d'avoir deux missions actives.
@@ -62,17 +64,29 @@ K_EQUITE_MIN = {
 }
 
 
-def agents_exclus(db: Session, mission_id: int) -> set[int]:
-    """Agents à ne plus solliciter pour cette mission : ceux qui l'ont refusée ou laissée sans réponse.
+# Durée pendant laquelle un agent qui a refusé (ou laissé sans réponse) une mission n'est plus sollicité
+DUREE_EXCLUSION = timedelta(minutes=5)
+
+
+def exclus_parmi(lignes: list[Historique], instant: datetime | None = None) -> set[int]:
+    """Agents exclus d'une mission d'après ses lignes de journal : refus ou non-réponse de moins de 5 min.
     Ce sont les retours en attente du journal qui désignent un agent."""
-    lignes = (db.query(Historique.brancardier_id, Historique.auteur_id, Historique.motif_refus)
-              .filter(Historique.mission_id == mission_id,
-                      Historique.statut_modifie_en == StatutMission.EN_ATTENTE)
-              .all())
-    exclus = {agent_id for agent_id, _, _ in lignes if agent_id is not None}
-    # Refus enregistrés avant l'ajout de la colonne « agent concerné » : l'agent est l'auteur
-    exclus |= {auteur_id for _, auteur_id, motif in lignes if motif is not None and auteur_id is not None}
+    depuis = (instant or maintenant()) - DUREE_EXCLUSION
+    exclus = set()
+    for l in lignes:
+        if l.statut_modifie_en != StatutMission.EN_ATTENTE or en_utc(l.horodatage) < depuis:
+            continue
+        if l.brancardier_id is not None:
+            exclus.add(l.brancardier_id)
+        elif l.motif_refus is not None and l.auteur_id is not None:
+            # Refus enregistré avant l'ajout de la colonne « agent concerné » : l'agent est l'auteur
+            exclus.add(l.auteur_id)
     return exclus
+
+
+def agents_exclus(db: Session, mission_id: int) -> set[int]:
+    """Agents à ne pas solliciter pour cette mission en ce moment"""
+    return exclus_parmi(db.query(Historique).filter(Historique.mission_id == mission_id).all())
 
 
 def bloquee_pour_materiel(db: Session, mission_id: int) -> bool:

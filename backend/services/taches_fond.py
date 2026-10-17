@@ -8,7 +8,8 @@ import logging
 import os
 
 from database import SessionLocal
-from services.assignation_service import gerer_propositions_expirees, gerer_reprise_service_auto
+from services.assignation_service import (gerer_propositions_expirees, gerer_reprise_service_auto,
+                                          traiter_file_attente)
 
 journal = logging.getLogger("smart_brancard.taches_fond")
 
@@ -26,6 +27,10 @@ def executer_taches_periodiques() -> None:
         repris = gerer_reprise_service_auto(db)
         if repris:
             journal.info("%s agent(s) remis disponible(s) en fin de pause", repris)
+        # Missions en attente dont une exclusion vient de tomber (5 min après un refus ou une non-réponse)
+        proposees = traiter_file_attente(db)
+        if proposees:
+            journal.info("%s mission(s) en attente proposée(s)", proposees)
     finally:
         db.close()
 

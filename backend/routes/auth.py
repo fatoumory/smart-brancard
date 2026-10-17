@@ -8,6 +8,7 @@ from database import get_db
 from models.enums import Role
 from models.utilisateur import Brancardier, Utilisateur
 from schemas.utilisateur import Token, UtilisateurCreate, UtilisateurOut
+from services.assignation_service import traiter_file_attente
 from services.auth_service import (
     hash_password,
     verify_password,
@@ -47,6 +48,11 @@ def inscription(
     )
     db.add(nouvel_utilisateur)
     db.commit()
+
+    # Un nouveau brancardier est DISPONIBLE dès sa création : il reçoit aussitôt
+    # la première mission en attente, comme un agent qui se remet disponible
+    if donnees.role == Role.BRANCARDIER:
+        traiter_file_attente(db)
     db.refresh(nouvel_utilisateur)
     return nouvel_utilisateur
 

@@ -234,3 +234,59 @@ def test_agent_concerne_dans_le_journal(client, reg, medecin):
     lignes = client.get(f"/missions/{m['id']}/historique", headers=medecin).json()
     assert [(l["statut_modifie_en"], l["brancardier_id"]) for l in lignes] == [
         ("EN_ATTENTE", None), ("PROPOSE", a), ("ACCEPTE", a)]
+
+
+#  Mission sans candidat : alerte, puis exclusion levée au bout de 5 min
+
+def vieillir_exclusions(minutes):
+    """Simule l'écoulement du temps : les refus et non-réponses datent de `minutes` minutes"""
+    from models.historique import Historique
+    db = SessionLocal()
+    db.query(Historique).filter(Historique.statut_modifie_en == "EN_ATTENTE",
+                                Historique.brancardier_id.is_not(None)).update(
+        {"horodatage": datetime.now(timezone.utc) - timedelta(minutes=minutes)})
+    db.commit()
+    db.close()
+
+
+def test_aucun_brancardier_inscrit(client, medecin):
+    assert demande(client, medecin)["sans_candidat"] is True
+
+
+def test_tous_les_agents_exclus(client, reg, medecin):
+    a, _ = agent(client, reg, "a", URGENCES)
+    m = demande(client, medecin, urgence="URGENT")
+    assert m["sans_candidat"] is False   # proposée : rien à signaler
+    expirer(31)
+    # Le seul agent n'a pas répondu : il reste disponible mais exclu ; personne d'autre
+    apres = client.get(f"/missions/{m['id']}", headers=reg).json()
+    assert apres["statut"] == "EN_ATTENTE" and apres["sans_candidat"] is True
+
+    # Le régulateur réaffecte sans attendre : l'alerte disparaît
+    r = client.put(f"/missions/{m['id']}/reaffecter", json={"brancardier_id": a}, headers=reg)
+    assert r.json()["statut"] == "PROPOSE" and r.json()["sans_candidat"] is False
+
+
+def test_exclusion_levee_au_bout_de_5_minutes(client, reg, medecin):
+    from services.taches_fond import executer_taches_periodiques
+    a, _ = agent(client, reg, "a", URGENCES)
+    m = demande(client, medecin, urgence="URGENT")
+    expirer(31)
+    vieillir_exclusions(4)
+    executer_taches_periodiques()
+    assert client.get(f"/missions/{m['id']}", headers=reg).json()["brancardier_id"] is None  # encore exclu
+
+    vieillir_exclusions(6)
+    executer_taches_periodiques()   # la tâche de fond relance la file sans autre action
+    apres = client.get(f"/missions/{m['id']}", headers=reg).json()
+    assert apres["statut"] == "PROPOSE" and apres["brancardier_id"] == a
+
+
+def test_pas_d_alerte_si_un_agent_peut_encore_la_prendre(client, reg, medecin):
+    agent(client, reg, "a", URGENCES)
+    agent(client, reg, "b", REANIMATION)
+    _, entetes_b = agent(client, reg, "c", REANIMATION)
+    client.patch("/utilisateurs/me/statut", json={"statut": "EN_PAUSE"}, headers=entetes_b)
+    m = demande(client, medecin, urgence="URGENT")
+    expirer(31)   # « a » n'a pas répondu ; « b » reçoit la mission
+    assert client.get(f"/missions/{m['id']}", headers=reg).json()["sans_candidat"] is False
