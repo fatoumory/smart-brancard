@@ -1,7 +1,27 @@
-import { useState } from "react";
-import { CircleCheck, CircleX, Flag, MapPin, Route, ShieldAlert, TriangleAlert, UserRound } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CircleCheck, CircleX, Flag, MapPin, Route, ShieldAlert, Timer, TriangleAlert, UserRound } from "lucide-react";
 import { BadgeUrgence, Materiel } from "../Badges";
 import { MOTIFS_REFUS } from "../../services/referentiel";
+
+// Sous ce nombre de secondes, le compte à rebours passe au rouge
+const SECONDES_ALERTE = 10;
+
+
+// Secondes restantes jusqu'à une heure donnée par le serveur, recalculées chaque seconde.
+// Renvoie null si le serveur n'a pas donné d'heure.
+function useSecondesRestantes(finIso) {
+    const [maintenant, setMaintenant] = useState(() => Date.now());
+
+    // Battement de l'horloge : une mise à jour par seconde
+    useEffect(() => {
+        if (!finIso) return undefined;
+        const minuteur = setInterval(() => setMaintenant(Date.now()), 1000);
+        return () => clearInterval(minuteur);
+    }, [finIso]);
+
+    if (!finIso) return null;
+    return Math.max(0, Math.ceil((new Date(finIso).getTime() - maintenant) / 1000));
+}
 
 // Mission proposée au brancardier : détails utiles au transport, puis Accepter ou Refuser.
 // Seules des informations logistiques sont affichées : nom, prénom, trajet, matériel, consigne.
@@ -9,6 +29,12 @@ function MissionProposee({ mission, envoi, onAccepter, onRefuser }) {
     // Panneau des motifs de refus ouvert, et motif choisi
     const [refusOuvert, setRefusOuvert] = useState(false);
     const [motif, setMotif] = useState(null);
+
+    // Temps laissé pour répondre : fin_reponse est calculée par le serveur (30, 45 ou 60 s selon l'urgence)
+    const secondes = useSecondesRestantes(mission.fin_reponse);
+    // Délai écoulé : on ne peut plus répondre, le serveur va proposer la mission à un autre agent
+    const expiree = secondes === 0;
+
 
     function fermerRefus() {
         setRefusOuvert(false);
@@ -22,6 +48,9 @@ function MissionProposee({ mission, envoi, onAccepter, onRefuser }) {
                 <p className="text-xl font-bold text-slate-900">Nouvelle mission</p>
                 <BadgeUrgence niveau={mission.niveau_urgence} />
             </div>
+            {/* Compte à rebours de réponse, en haut pour être vu tout de suite */}
+            {secondes !== null && <DelaiReponse secondes={secondes} />}
+
 
             {/* Fiche de la mission */}
             <section className="bg-white rounded-3xl shadow-sm divide-y divide-slate-100">
@@ -91,18 +120,18 @@ function MissionProposee({ mission, envoi, onAccepter, onRefuser }) {
             {/* Les deux réponses possibles : grands boutons, faciles à toucher */}
             <div className="grid grid-cols-2 gap-3">
                 {/* Refuser n'envoie rien : il ouvre seulement le choix du motif */}
-                <button type="button" onClick={() => setRefusOuvert((o) => !o)} disabled={envoi}
+                <button type="button" onClick={() => setRefusOuvert((o) => !o)} disabled={envoi || expiree}
                     aria-expanded={refusOuvert} aria-controls="motifs-refus"
                     className="h-14 rounded-2xl bg-white border-2 border-red-200 text-red-700 font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60">
                     <CircleX className="w-5 h-5" /> Refuser
                 </button>
-                <button type="button" onClick={onAccepter} disabled={envoi}
+                <button type="button" onClick={onAccepter} disabled={envoi || expiree}
                     className="h-14 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60">
                     <CircleCheck className="w-5 h-5" /> Accepter
                 </button>
             </div>
 
-            <MotifsRefus ouvert={refusOuvert} motif={motif} envoi={envoi} onChoisir={setMotif}
+            <MotifsRefus ouvert={refusOuvert && !expiree} motif={motif} envoi={envoi} onChoisir={setMotif}
                 onConfirmer={() => onRefuser(motif)} onAnnuler={fermerRefus} />
 
             {/* Itinéraire calculé par Dijkstra, étape par étape (du départ à la destination) */}
@@ -124,6 +153,29 @@ function MissionProposee({ mission, envoi, onAccepter, onRefuser }) {
         </div>
     );
 }
+
+// Compte à rebours de réponse : bleu, puis rouge dans les dernières secondes.
+// À 0, le téléphone attend que le serveur reprenne la mission (il relit la mission toutes les 5 s).
+function DelaiReponse({ secondes }) {
+    if (secondes === 0) {
+        return (
+            <p className="p-3 rounded-2xl bg-slate-100 text-slate-600 text-sm text-center">
+                Délai de réponse dépassé : la mission va être proposée à un autre agent.
+            </p>
+        );
+    }
+    const presse = secondes <= SECONDES_ALERTE;
+    return (
+        <div role="timer" className={`flex items-center justify-center gap-2 p-3 rounded-2xl font-semibold ${
+            presse ? "bg-red-50 text-red-700" : "bg-primaire-clair text-primaire"}`}>
+            <Timer className="w-5 h-5" />
+            Répondez dans
+            {/* tabular-nums : les chiffres gardent la même largeur, le texte ne « saute » pas */}
+            <span><span className="text-2xl font-extrabold tabular-nums">{secondes}</span> s</span>
+        </div>
+    );
+}
+
 
 // Choix du motif de refus : se déplie sous les boutons (même principe que le choix de la pause).
 // Le motif est obligatoire : le refus n'est envoyé qu'après le bouton « Confirmer le refus ».
