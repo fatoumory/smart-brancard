@@ -23,8 +23,15 @@ function Regulateur() {
     const typesNoeuds = Object.fromEntries((noeuds.donnees ?? []).map((n) => [n.id, n.type_noeud]));
     // Terminées aujourd'hui : d'après l'heure de fin réelle (date_fin, lue dans le journal),
     // et non l'heure de la demande (une demande d'hier terminée ce matin compte pour aujourd'hui)
-    const terminees = liste.filter((m) => m.statut === "TERMINE" && m.date_fin
-        && new Date(m.date_fin).toDateString() === aujourdhui).length;
+    const termineesDuJour = liste.filter((m) => m.statut === "TERMINE" && m.date_fin
+        && new Date(m.date_fin).toDateString() === aujourdhui);
+    const terminees = termineesDuJour.length;
+    // Taux dans les délais (maquette) : part des missions terminées aujourd'hui prises en charge
+    // avant la limite garantie. dans_les_delais est calculé par le serveur ; vide s'il est inconnu.
+    const evaluees = termineesDuJour.filter((m) => m.dans_les_delais !== null);
+    const taux = evaluees.length
+        ? Math.round((100 * evaluees.filter((m) => m.dans_les_delais).length) / evaluees.length)
+        : null;
 
 
     function toutRecharger() {
@@ -69,7 +76,8 @@ function Regulateur() {
                     <CarteIndicateur titre="Disponibles" valeur={disponibles}
                         detail={`agents sur ${agents.donnees?.length ?? 0}`} icone={Users} couleur="vert" />
                     <CarteIndicateur titre="Terminées" valeur={terminees}
-                        detail="Aujourd'hui, depuis minuit" icone={CircleCheck} couleur="vert" />
+                        detail={taux !== null ? `Taux : ${taux} % dans les délais` : "Aujourd'hui, depuis minuit"}
+                        icone={CircleCheck} couleur="vert" />
                 </div>
 
                 {/* Après une réaffectation ou une annulation, missions et agents sont relus aussitôt */}
