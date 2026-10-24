@@ -48,4 +48,20 @@ export function scannerArrivee(id, tagNfc) {
     return apiFetch(`/missions/${id}/scan-arrivee`, { method: "POST", json: { tag_nfc: tagNfc } });
 }
 
+/** Missions terminées par l'agent aujourd'hui, de la plus récente à la plus ancienne (onglet Journal) */
+export function getMonJournal() {
+    return apiFetch("/missions/moi/journal");
+}
+
+/** Dernière position connue de l'agent : { noeud_id, noeud_nom, date_heure } ; null s'il n'a jamais été détecté */
+export function getMaPosition() {
+    return apiFetch("/detections/me");
+}
+
+/** Balise BLE simulée : signale au serveur que l'agent se trouve au lieu noeudId.
+ *  C'est cette position qui permet de proposer les missions à l'agent le plus proche (CDC §5.3) */
+export function signalerPosition(noeudId) {
+    return apiFetch("/detections", { method: "POST", json: { noeud_id: noeudId } });
+}
+
 

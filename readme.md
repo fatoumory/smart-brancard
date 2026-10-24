@@ -191,6 +191,7 @@ npm run build
 - **Journal d'audit immuable** : chaque changement de statut d'une mission ajoute une ligne horodatée. Un déclencheur PostgreSQL interdit de les modifier ou de les supprimer (CDC §7.3).
 - **Aucune donnée clinique** n'est stockée, seulement l'identité et la logistique du transport (CDC §7.2).
 - **Session de 8 h côté frontend** : le jeton JWT est gardé dans le navigateur. Un jeton expiré, ou une réponse 401 de l'API, renvoie à l'écran de connexion. La déconnexion efface le jeton et le rôle.
+- **Balises BLE simulées** : dans l'application du brancardier, le sélecteur « Je suis à » envoie la position de l'agent (`POST /detections`) dès qu'elle change, puis toutes les 2 min tant que l'application est ouverte, comme une vraie balise. Les scans de départ et d'arrivée mettent aussi la position à jour. Sans position récente (moins de 10 min), l'agent passe après les agents localisés dans l'assignation, et son arrivée estimée n'est pas calculée.
 - **Rafraîchissement périodique** : le dashboard se met à jour toutes les 15 s, le suivi du médecin toutes les 10 s, et la mission du brancardier toutes les 5 s (une proposition n'attend que 30 à 60 s). Les WebSockets du Sprint 4 remplaceront ces mécanismes.
 
 ## Avancement
