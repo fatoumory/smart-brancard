@@ -91,7 +91,7 @@ function Brancardier() {
     // Le serveur a enregistré cette position ; la balise simulée la reprend, pour ne pas renvoyer l'ancien lieu.
     async function prendreEnCharge(corps) {
         const enTransit = await scanner(() => scannerDepart(mission.donnees.id, corps));
-        balise.setLieu(enTransit.noeud_source_id);
+        balise.apresScan(enTransit.noeud_source_nom);
     }
 
     // Scan d'arrivée réussi : le serveur renvoie la mission TERMINE, gardée pour la confirmation.
@@ -99,7 +99,7 @@ function Brancardier() {
     async function terminerMission(tagNfc) {
         const terminee = await scanner(() => scannerArrivee(mission.donnees.id, tagNfc));
         setMissionTerminee(terminee);
-        balise.setLieu(terminee.noeud_destination_id);
+        balise.apresScan(terminee.noeud_destination_nom);
     }
 
     const titre = ONGLETS.find((o) => o.id === onglet).titre;

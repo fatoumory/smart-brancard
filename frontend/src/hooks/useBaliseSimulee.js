@@ -7,32 +7,38 @@ import { getMaPosition, signalerPosition } from "../services/brancardierService"
 const INTERVALLE_BALISE_MS = 2 * 60 * 1000;
 
 /**
- * Balise BLE simulée : position de l'agent, envoyée au serveur (POST /detections)
- * dès qu'elle change, puis toutes les 2 min tant que l'application est ouverte.
- * Sans elle, l'assignation ne peut pas choisir l'agent le plus proche (CDC §5.3)
- * et l'arrivée estimée n'est jamais calculée.
+ * Balise BLE simulée : position de l'agent envoyée au serveur (POST /detections).
+ * Seul un lieu CHOISI par l'agent est renvoyé toutes les 2 min, tant que l'application est ouverte.
+ * Une position reprise du serveur ou enregistrée par un scan n'est jamais renvoyée : si l'agent
+ * se déplace sans la mettre à jour, elle devient périmée au bout de 10 min, et le serveur
+ * ne le croit plus à côté (il passe après les agents localisés, sans être exclu).
  * À utiliser dans la page (et non dans un onglet) : l'envoi continue quel que soit l'onglet affiché.
- * @returns {{ lieu, setLieu, envoyeA, erreur }}
+ * @returns {{ lieu, choisir, apresScan, derniere, envoyeA, erreur }}
  */
 export function useBaliseSimulee() {
-  // id du lieu où se trouve l'agent (null tant qu'il n'est pas connu)
+  // id du lieu choisi par l'agent dans « Je suis à » : le seul qui est renvoyé (null sinon)
   const [lieu, setLieu] = useState(null);
+  // Dernière position connue mais non confirmée par l'agent, affichée pour information :
+  // { nom, date, origine: "scan" | "serveur" }
+  const [derniere, setDerniere] = useState(null);
   // Heure du dernier envoi accepté par le serveur
   const [envoyeA, setEnvoyeA] = useState(null);
   const [erreur, setErreur] = useState("");
 
-  // Ouverture de l'application : on repart de la dernière position connue du serveur.
-  // Si l'agent a déjà choisi un lieu entre-temps, son choix est gardé.
+  // Ouverture de l'application : on affiche la dernière position connue du serveur, sans la renvoyer
+  // (elle peut dater d'avant une pause ou de la veille).
   useEffect(() => {
     let actif = true;
     getMaPosition().then(
-      (position) => { if (actif && position) setLieu((choisi) => choisi ?? position.noeud_id); },
+      (position) => {
+        if (actif && position) setDerniere({ nom: position.noeud_nom, date: position.date_heure, origine: "serveur" });
+      },
       () => {},   // sans position connue, l'agent la choisira lui-même
     );
     return () => { actif = false; };
   }, []);
 
-  // Envoi immédiat à chaque changement de lieu, puis toutes les 2 min
+  // Lieu choisi par l'agent : envoi immédiat, puis toutes les 2 min
   useEffect(() => {
     if (!lieu) return undefined;
     let actif = true;
@@ -50,5 +56,19 @@ export function useBaliseSimulee() {
     };
   }, [lieu]);
 
-  return { lieu, setLieu, envoyeA, erreur };
+  // L'agent indique où il est : c'est une position confirmée, renvoyée toutes les 2 min
+  function choisir(id) {
+    setLieu(id);
+    setDerniere(null);
+  }
+
+  // Scan de départ ou d'arrivée réussi : le serveur a enregistré la salle scannée (position sûre).
+  // On arrête de renvoyer l'ancien lieu choisi : l'agent va repartir ailleurs, et cette position
+  // ne doit pas rester « fraîche » s'il ne la met pas à jour.
+  function apresScan(nomSalle) {
+    setLieu(null);
+    setDerniere({ nom: nomSalle, date: new Date().toISOString(), origine: "scan" });
+  }
+
+  return { lieu, choisir, apresScan, derniere, envoyeA, erreur };
 }
