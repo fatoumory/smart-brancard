@@ -5,7 +5,10 @@ import EcranJournal from "../components/brancardier/EcranJournal";
 import EcranProfil from "../components/brancardier/EcranProfil";
 import { useDonnees } from "../hooks/useDonnees";
 import { MissionTerminee } from "../components/brancardier/MissionEnCours";
+import MaPosition from "../components/brancardier/MaPosition";
+import { useBaliseSimulee } from "../hooks/useBaliseSimulee";
 import { accepterMission, changerMonStatut, getMaMission, getMonProfil, refuserMission, scannerArrivee, scannerDepart } from "../services/brancardierService";
+import { listerNoeuds } from "../services/missionService";
 import { STATUTS_AGENT } from "../services/referentiel";
 
 // Le profil (statut, missions du jour) est relu toutes les 30 s, en attendant les WebSockets du Sprint 4
@@ -33,7 +36,10 @@ function Brancardier() {
     const mission = useDonnees(getMaMission, INTERVALLE_MISSION_MS);
     // Mission que l'agent vient de terminer (scan d'arrivée réussi) : confirmation affichée jusqu'à fermeture
     const [missionTerminee, setMissionTerminee] = useState(null);
-
+    // Position de l'agent (balise BLE simulée), envoyée toutes les 2 min quel que soit l'onglet
+    const balise = useBaliseSimulee();
+    // Lieux de l'hôpital pour le sélecteur « Je suis à » : le plan change rarement, chargé une fois
+    const lieux = useDonnees(listerNoeuds);
 
     // Change le statut sur le serveur, puis relit le profil pour afficher le nouvel état.
     // dureePauseMinutes n'est envoyé que pour une pause (15 ou 45 min) : le serveur en déduit l'heure de fin. Renvoie true si le changement a réussi
@@ -81,10 +87,19 @@ function Brancardier() {
         }
     }
 
-    // Scan d'arrivée réussi : le serveur renvoie la mission TERMINE, gardée pour la confirmation
+    // Scan de départ réussi : l'agent est au point de départ.
+    // Le serveur a enregistré cette position ; la balise simulée la reprend, pour ne pas renvoyer l'ancien lieu.
+    async function prendreEnCharge(corps) {
+        const enTransit = await scanner(() => scannerDepart(mission.donnees.id, corps));
+        balise.apresScan(enTransit.noeud_source_nom);
+    }
+
+    // Scan d'arrivée réussi : le serveur renvoie la mission TERMINE, gardée pour la confirmation.
+    // L'agent est maintenant à la destination : même mise à jour de la balise.
     async function terminerMission(tagNfc) {
         const terminee = await scanner(() => scannerArrivee(mission.donnees.id, tagNfc));
         setMissionTerminee(terminee);
+        balise.apresScan(terminee.noeud_destination_nom);
     }
 
     const titre = ONGLETS.find((o) => o.id === onglet).titre;
@@ -114,6 +129,9 @@ function Brancardier() {
                 )}
                 {!moi && profil.chargement && <p className="text-center text-slate-500 py-10">Chargement…</p>}
 
+                {/* Sélecteur « Je suis à » : simulation des balises BLE (prototype) */}
+                {moi && onglet === "mission" && <MaPosition balise={balise} lieux={lieux.donnees ?? []} />}
+
                 {/* Étape « Terminé » du parcours : au-dessus de l'écran suivant (attente ou nouvelle mission) */}
                 {missionTerminee && onglet === "mission" && (
                     <MissionTerminee mission={missionTerminee} onFermer={() => setMissionTerminee(null)} />
@@ -124,7 +142,7 @@ function Brancardier() {
                         rechargerProfil={profil.recharger}
                         onAccepter={() => repondre(() => accepterMission(mission.donnees.id))}
                         onRefuser={(motif) => repondre(() => refuserMission(mission.donnees.id, motif))}
-                        onScanDepart={(corps) => scanner(() => scannerDepart(mission.donnees.id, corps))}
+                        onScanDepart={prendreEnCharge}
                         onScanArrivee={terminerMission} />
                 )}
 

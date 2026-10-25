@@ -191,6 +191,8 @@ npm run build
 - **Journal d'audit immuable** : chaque changement de statut d'une mission ajoute une ligne horodatée. Un déclencheur PostgreSQL interdit de les modifier ou de les supprimer (CDC §7.3).
 - **Aucune donnée clinique** n'est stockée, seulement l'identité et la logistique du transport (CDC §7.2).
 - **Session de 8 h côté frontend** : le jeton JWT est gardé dans le navigateur. Un jeton expiré, ou une réponse 401 de l'API, renvoie à l'écran de connexion. La déconnexion efface le jeton et le rôle.
+- **Balises BLE simulées** : dans l'application du brancardier, le lieu choisi dans « Je suis à » est envoyé (`POST /detections`) aussitôt, puis toutes les 2 min tant que l'application est ouverte, comme une vraie balise. Les scans de départ et d'arrivée enregistrent la salle scannée, mais ni cette position ni celle reprise à l'ouverture ne sont renvoyées : si l'agent se déplace sans choisir son lieu, sa position est ignorée au bout de 10 min (il passe après les agents localisés, sans être exclu), et son arrivée estimée n'est pas calculée.
+
 - **Rafraîchissement périodique** : le dashboard se met à jour toutes les 15 s, le suivi du médecin toutes les 10 s, et la mission du brancardier toutes les 5 s (une proposition n'attend que 30 à 60 s). Les WebSockets du Sprint 4 remplaceront ces mécanismes.
 
 ## Avancement
@@ -199,6 +201,6 @@ npm run build
 - [x] Sprint 1 : authentification JWT, rôles, modèles de données
 - [x] Sprint 2 (backend) : graphe, Dijkstra, missions, admission des patients, historique, routes de lecture
 - [x] Sprint 2 (frontend) : application installable (PWA), dashboard du régulateur, demande de transport et suivi du médecin
-- [ ] Sprint 3 : attribution automatique, application mobile du brancardier, scans NFC et QR
+- [x] Sprint 3 : attribution automatique, application mobile du brancardier, scans NFC et QR
 - [ ] Sprint 4 : dictée vocale (Whisper), temps réel (WebSockets, Redis)
 - [ ] Sprint 5 : tests de charge (Locust), données MIMIC-III, lancement en une commande

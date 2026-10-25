@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
-import { CircleCheck, CircleX, Hourglass, RefreshCw } from "lucide-react";
+import { CircleCheck, CircleX, Hourglass, RefreshCw, ShieldAlert, ShieldCheck, Timer } from "lucide-react";
 import EnTete from "../components/EnTete";
 import { BadgeUrgence } from "../components/Badges";
 import { useDonnees } from "../hooks/useDonnees";
@@ -86,6 +86,8 @@ function SuiviDemande() {
                             </ol>
                         </section>
 
+                        {mission.statut !== "ANNULE" && <GarantiePriseEnCharge mission={mission} />}
+
                         <section className="bg-white rounded-2xl border border-slate-200 p-5 flex items-start gap-4">
                             {mission.statut === "ANNULE"
                                 ? <CircleX className="w-6 h-6 text-red-600 shrink-0" />
@@ -110,6 +112,69 @@ function SuiviDemande() {
                 </Link>
             </main>
         </div>
+    );
+}
+
+// Encadré « Garantie de prise en charge » (maquette) : délai garanti selon l'urgence,
+// brancardier assigné, sa position et son arrivée estimée au point de départ.
+// Toutes ces valeurs sont calculées par le serveur (MissionOut) ; l'arrivée estimée n'existe
+// que si la position de l'agent est connue (balise détectée il y a moins de 10 min).
+function GarantiePriseEnCharge({ mission }) {
+    // Agent qui a accepté la mission (ou l'a déjà terminée)
+    const accepte = ["ACCEPTE", "EN_TRANSIT", "TERMINE"].includes(mission.statut);
+    // Agent en approche : sa position et son arrivée estimée ont un sens
+    const enApproche = mission.statut === "PROPOSE" || mission.statut === "ACCEPTE";
+    const depasse = mission.dans_les_delais === false;
+
+    // Titre et couleur : garantie confirmée, délai dépassé, ou simple rappel du délai
+    const [titre, classe, Icone] = depasse
+        ? ["Délai garanti dépassé", "bg-red-50 border-red-200 text-red-800", ShieldAlert]
+        : accepte
+            ? ["Garantie de prise en charge confirmée", "bg-emerald-50 border-emerald-200 text-emerald-800", ShieldCheck]
+            : ["Délai garanti", "bg-primaire-clair border-blue-200 text-primaire", Timer];
+
+    return (
+        <section className={`rounded-2xl border p-5 ${classe}`}>
+            <p className="flex items-center gap-2 font-semibold">
+                <Icone className="w-5 h-5" /> {titre}
+            </p>
+            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                <dt className="opacity-80">Délai garanti</dt>
+                <dd className="font-medium">
+                    {mission.delai_garanti_min} min · prise en charge avant {formaterHeure(mission.limite_prise_en_charge)}
+                </dd>
+
+                <dt className="opacity-80">Brancardier</dt>
+                <dd className="font-medium">
+                    {mission.brancardier_id !== null
+                        ? `${mission.brancardier_prenom} ${mission.brancardier_nom}`
+                        : "En cours d'attribution"}
+                </dd>
+
+                {/* Position et arrivée : seulement pendant l'approche de l'agent */}
+                {mission.brancardier_id !== null && enApproche && (
+                    <>
+                        <dt className="opacity-80">Position actuelle</dt>
+                        <dd className="font-medium">{mission.brancardier_position_nom ?? "Inconnue"}</dd>
+
+                        <dt className="opacity-80">Arrivée estimée</dt>
+                        <dd className="font-medium">
+                            {mission.arrivee_estimee
+                                ? `${formaterHeure(mission.arrivee_estimee)} au point de départ`
+                                : "Non calculée (position de l'agent inconnue)"}
+                        </dd>
+                    </>
+                )}
+
+                {/* Prise en charge effective : heure du scan de départ */}
+                {mission.date_prise_en_charge && (
+                    <>
+                        <dt className="opacity-80">Pris en charge</dt>
+                        <dd className="font-medium">{formaterHeure(mission.date_prise_en_charge)}</dd>
+                    </>
+                )}
+            </dl>
+        </section>
     );
 }
 
