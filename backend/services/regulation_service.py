@@ -1,8 +1,9 @@
 # services/regulation_service.py
 # Actions d'exception du régulateur (maquette : menu « ⋯ » de la file des missions) :
 #   - réaffecter manuellement une mission à un brancardier choisi ;
-#   - annuler une mission.
-# L'agent précédemment sollicité est libéré dans les deux cas.
+#   - annuler une mission ;
+#   - clôturer une mission en transit que ni le badge ni l'agent n'ont pu terminer.
+# L'agent précédemment sollicité est libéré dans tous les cas.
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -10,7 +11,7 @@ from sqlalchemy.orm import Session
 from models.enums import StatutAgent, StatutMission
 from models.mission import Mission
 from models.utilisateur import Brancardier, Utilisateur
-from services.assignation_service import traiter_file_attente
+from services.assignation_service import incrementer_compteur, traiter_file_attente
 from services.historique_service import changer_statut
 
 
@@ -84,6 +85,32 @@ def annuler_mission(db: Session, mission_id: int, regulateur: Utilisateur) -> Mi
     agent_id = mission.brancardier_id
     liberer_agent(db, mission)
     changer_statut(db, mission, StatutMission.ANNULE, auteur_id=regulateur.id, agent_id=agent_id)
+    db.commit()
+
+    traiter_file_attente(db)
+    db.refresh(mission)
+    return mission
+
+
+def cloturer_mission(db: Session, mission_id: int, regulateur: Utilisateur) -> Mission:
+    """Le régulateur termine une mission restée « en transit » : badge oublié ou récepteur en
+    panne, patient remis ailleurs, téléphone de l'agent éteint... Sans lui, la mission resterait
+    bloquée et l'agent ne recevrait plus jamais de mission.
+    La clôture est tracée « MANUEL » avec le nom du régulateur. L'agent reste celui qui a
+    transporté le patient (il n'est pas retiré de la mission) et redevient disponible."""
+    mission = db.query(Mission).filter(Mission.id == mission_id).with_for_update().one_or_none()
+    if mission is None:
+        raise MissionIntrouvable()
+    if mission.statut != StatutMission.EN_TRANSIT:
+        raise ActionImpossible("Seule une mission en transit peut être clôturée ; "
+                               "avant la prise en charge, réaffectez-la ou annulez-la")
+
+    changer_statut(db, mission, StatutMission.TERMINE, auteur_id=regulateur.id,
+                   agent_id=mission.brancardier_id)
+    agent = db.get(Brancardier, mission.brancardier_id)
+    if agent is not None:
+        incrementer_compteur(agent)
+        agent.statut = StatutAgent.DISPONIBLE
     db.commit()
 
     traiter_file_attente(db)

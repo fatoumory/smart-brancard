@@ -20,8 +20,8 @@ from services.assignation_service import (MissionNonProposee, ReponseImpossible,
                                          refuser_mission, traiter_file_attente)
 from services.historique_service import changer_statut, historique_de
 from services.regulation_service import (ActionImpossible, MissionIntrouvable, annuler_mission,
-                                        reaffecter_manuellement)
-from services.scan_service import ScanInvalide, scanner_arrivee, scanner_depart
+                                        cloturer_mission, reaffecter_manuellement)
+from services.scan_service import ScanInvalide, declarer_arrivee, scanner_arrivee, scanner_depart
 from services.vue_mission_service import construire_missions_out
 
 # Préfixe commun à toutes les routes de ce fichier: /missions/...
@@ -314,6 +314,21 @@ def scan_arrivee(
     return vers_mission_out(db, mission)
 
 
+# Bouton « Arrivé » : clôture par l'agent quand son badge n'a pas été détecté à l'arrivée (secours)
+@router.post("/{mission_id}/arrivee", response_model=MissionOut)
+def arrivee_declaree(
+    mission_id: int,
+    db: Session = Depends(get_db),
+    current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
+):
+    try:
+        mission = declarer_arrivee(db, mission_id, current_user)
+    except (MissionNonProposee, ReponseImpossible) as e:
+        db.rollback()
+        raise erreur_scan(e, "arrivée") from None
+    return vers_mission_out(db, mission)
+
+
 #  Actions d'exception du régulateur (maquette : menu « ⋯ » de la file des missions)
 
 def erreur_regulation(e: Exception) -> HTTPException:
@@ -347,6 +362,21 @@ def annuler(
 ):
     try:
         mission = annuler_mission(db, mission_id, current_user)
+    except (MissionIntrouvable, ActionImpossible) as e:
+        db.rollback()
+        raise erreur_regulation(e) from None
+    return vers_mission_out(db, mission)
+
+
+# Clôture par le régulateur : une mission en transit que ni le badge ni l'agent n'ont terminée
+@router.put("/{mission_id}/cloturer", response_model=MissionOut)
+def cloturer(
+    mission_id: int,
+    db: Session = Depends(get_db),
+    current_user: Utilisateur = Depends(require_role([Role.REGULATEUR]))
+):
+    try:
+        mission = cloturer_mission(db, mission_id, current_user)
     except (MissionIntrouvable, ActionImpossible) as e:
         db.rollback()
         raise erreur_regulation(e) from None

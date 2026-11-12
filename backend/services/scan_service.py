@@ -91,3 +91,19 @@ def scanner_arrivee(db: Session, mission_id: int, agent: Brancardier, tag_nfc: s
     traiter_file_attente(db)
     db.refresh(mission)
     return mission
+
+
+def declarer_arrivee(db: Session, mission_id: int, agent: Brancardier) -> Mission:
+    """Bouton « Arrivé » : secours quand le badge n'a pas été détecté dans la salle d'arrivée
+    (badge oublié, récepteur en panne). Rien n'est prouvé : la clôture est tracée « MANUEL »,
+    avec l'agent comme auteur. L'agent redevient disponible."""
+    mission = mission_de_l_agent(db, mission_id, agent, StatutMission.EN_TRANSIT)
+    changer_statut(db, mission, StatutMission.TERMINE, auteur_id=agent.id,
+                   methode=MethodeVerification.MANUEL, agent_id=agent.id)
+    incrementer_compteur(agent)
+    agent.statut = StatutAgent.DISPONIBLE
+    db.commit()
+
+    traiter_file_attente(db)
+    db.refresh(mission)
+    return mission
