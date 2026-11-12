@@ -43,12 +43,16 @@ function ouvrir() {
   // Pas connecté à l'application, ou plus personne n'écoute : rien à ouvrir
   if (!jeton || abonnes.size === 0 || socket) return;
 
-  socket = new WebSocket(adresseWebSocket());
+  // ws : cette connexion-ci. Une ancienne connexion, fermée entre-temps (écran quitté puis rouvert),
+  // peut encore recevoir des événements : ils sont ignorés, pour ne pas toucher à la nouvelle.
+  const ws = new WebSocket(adresseWebSocket());
+  socket = ws;
 
   // 1er message : le jeton (il n'est pas mis dans l'adresse, qui apparaît dans les journaux du serveur)
-  socket.onopen = () => socket.send(JSON.stringify({ jeton }));
+  ws.onopen = () => ws.send(JSON.stringify({ jeton }));
 
-  socket.onmessage = (evenement) => {
+  ws.onmessage = (evenement) => {
+    if (socket !== ws) return;
     let message;
     try {
       message = JSON.parse(evenement.data);
@@ -58,13 +62,15 @@ function ouvrir() {
     if (message.type === "connecte") {
       attenteMs = ATTENTE_MIN_MS;
       changerEtat(true);
-      minuteurPing = setInterval(() => socket?.readyState === WebSocket.OPEN && socket.send("ping"), INTERVALLE_PING_MS);
+      clearInterval(minuteurPing);
+      minuteurPing = setInterval(() => ws.readyState === WebSocket.OPEN && ws.send("ping"), INTERVALLE_PING_MS);
     } else if (message.type === "maj") {
       abonnes.forEach((f) => f(message.sujets));
     }
   };
 
-  socket.onclose = (evenement) => {
+  ws.onclose = (evenement) => {
+    if (socket !== ws) return;   // ancienne connexion : la nouvelle continue
     socket = null;
     clearInterval(minuteurPing);
     changerEtat(false);
@@ -78,8 +84,11 @@ function ouvrir() {
 function fermerSiPlusPersonne() {
   if (abonnes.size > 0) return;
   clearTimeout(minuteurReconnexion);
-  socket?.close();
+  clearInterval(minuteurPing);
+  const ancien = socket;
   socket = null;
+  ancien?.close();
+  changerEtat(false);
 }
 
 /** S'abonne aux changements : rappel(sujets) à chaque message. Renvoie la fonction de désabonnement. */
