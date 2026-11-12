@@ -34,7 +34,8 @@ class RefusMission(BaseModel):
 
 
 class ScanDepart(BaseModel):
-    """Corps de POST /missions/{id}/scan-depart : tag NFC de la salle puis QR du bracelet.
+    """Corps de POST /missions/{id}/scan-depart : QR du bracelet, et tag NFC de la salle
+    seulement si le badge de l'agent n'a pas été détecté au point de départ (secours).
     forcer_urgence=true : prise en charge sans scan, réservée aux missions URGENT (tracée)."""
     tag_nfc: str | None = Field(default=None, max_length=100)
     code_bracelet: str | None = Field(default=None, max_length=100)
@@ -92,6 +93,9 @@ class MissionOut(BaseModel):
     # et heure d'arrivée estimée (maquette du suivi médecin : « Arrivée estimée au point de départ »)
     temps_agent_min: float | None = None
     arrivee_estimee: datetime | None = None
+    # Mission ACCEPTE : le badge de l'agent vient d'être détecté au point de départ
+    # (le téléphone ouvre alors la caméra pour le scan du bracelet, sans geste de l'agent)
+    agent_au_depart: bool = False
 
     noeud_source_id: int
     noeud_source_nom: str

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models.enums import Role
+from models.enums import OrigineDetection, Role
 from models.noeud_hopital import NoeudHopital
 from models.utilisateur import Brancardier, Utilisateur
 from schemas.detection import DetectionBadge, DetectionCreate, DetectionOut
@@ -33,7 +33,8 @@ def detecter(
             detail="Lieu inconnu : aucune balise à cet endroit"
         )
 
-    detection = enregistrer_detection(db, current_user.id, noeud.id)
+    # Position déclarée par l'agent : elle sert à le classer, mais ne prouve pas sa présence
+    detection = enregistrer_detection(db, current_user.id, noeud.id, OrigineDetection.DECLARATION)
     db.commit()
     db.refresh(detection)
     return DetectionOut(id=detection.id, brancardier_id=current_user.id, noeud_id=noeud.id,

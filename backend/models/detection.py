@@ -3,8 +3,9 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer
 from database import Base
+from models.enums import OrigineDetection
 
 
 class Detection(Base):
@@ -18,3 +19,7 @@ class Detection(Base):
 
     date_heure = Column(DateTime(timezone=True), nullable=False,
                         default=lambda: datetime.now(timezone.utc), index=True)
+
+    # D'où vient la détection : seuls un badge ou un scan prouvent que l'agent est dans la salle
+    origine = Column(Enum(OrigineDetection, name="origine_detection"), nullable=False,
+                     default=OrigineDetection.DECLARATION, server_default=OrigineDetection.DECLARATION.value)

@@ -21,7 +21,7 @@ from models.utilisateur import Brancardier
 from schemas.mission import MissionOut
 from services.assignation_service import DELAIS_REPONSE, exclus_parmi
 from services.graphe_service import construire_graphe
-from services.position_service import en_utc, positions_actuelles
+from services.position_service import en_utc, positions_actuelles, prouve_la_presence
 
 # Statuts où l'agent rejoint le patient : l'arrivée estimée au point de départ a un sens
 STATUTS_EN_APPROCHE = {StatutMission.PROPOSE, StatutMission.ACCEPTE}
@@ -108,6 +108,9 @@ def construire_missions_out(db: Session, missions: list[Mission]) -> list[Missio
             temps_agent = distances.get(m.noeud_source_id, {}).get(detection.noeud_id)
             if temps_agent is not None:
                 arrivee = maintenant + timedelta(minutes=temps_agent)
+        # Badge détecté au point de départ d'une mission acceptée : le téléphone ouvre la caméra
+        agent_au_depart = (m.statut == StatutMission.ACCEPTE
+                           and prouve_la_presence(detection, m.noeud_source_id, maintenant))
 
         resultat.append(MissionOut(
             id=m.id,
@@ -130,6 +133,7 @@ def construire_missions_out(db: Session, missions: list[Mission]) -> list[Missio
             assignation_auto=assignation_auto,
             temps_agent_min=temps_agent,
             arrivee_estimee=arrivee,
+            agent_au_depart=agent_au_depart,
             noeud_source_id=m.noeud_source_id,
             noeud_source_nom=noms_noeuds[m.noeud_source_id],
             noeud_destination_id=m.noeud_destination_id,

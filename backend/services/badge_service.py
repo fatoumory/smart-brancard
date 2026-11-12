@@ -12,6 +12,7 @@
 from sqlalchemy.orm import Session
 
 from models.detection import Detection
+from models.enums import OrigineDetection
 from models.noeud_hopital import NoeudHopital
 from models.utilisateur import Brancardier
 from services.position_service import enregistrer_detection
@@ -34,7 +35,7 @@ def detecter_badge(db: Session, brancardier_id: int, noeud_id: int) -> Detection
     if db.get(NoeudHopital, noeud_id) is None:
         raise LieuInconnu()
 
-    detection = enregistrer_detection(db, agent.id, noeud_id)
+    detection = enregistrer_detection(db, agent.id, noeud_id, OrigineDetection.BADGE)
     db.commit()
     db.refresh(detection)
     return detection

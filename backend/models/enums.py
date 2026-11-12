@@ -61,6 +61,15 @@ class MethodeVerification(str, Enum):
     FORCE_URGENCE = "FORCE_URGENCE"
 
 
+class OrigineDetection(str, Enum):
+    # BADGE : capté par le récepteur d'une salle (simulateur ou ESP32) ; prouve la présence
+    # SCAN : enregistré par le serveur lors d'un scan de tag ; prouve la présence
+    # DECLARATION : l'agent a indiqué lui-même où il est (« Je suis à ») ; ne prouve rien
+    BADGE = "BADGE"
+    SCAN = "SCAN"
+    DECLARATION = "DECLARATION"
+
+
 class MotifRefus(str, Enum):
     MATERIEL_DEFECTUEUX = "MATERIEL_DEFECTUEUX"
     INDISPONIBILITE_PHYSIQUE = "INDISPONIBILITE_PHYSIQUE"

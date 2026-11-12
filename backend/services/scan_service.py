@@ -1,13 +1,13 @@
 # services/scan_service.py
-# Traçabilité du transport par scans (CDC §5.5) :
-#   - départ : tag NFC mural de la salle de départ (preuve de présence)
+# Traçabilité du transport par scans (CDC §4.6) :
+#   - départ : preuve de présence dans la salle de départ (badge détecté, sinon tag NFC mural)
 #              + QR du bracelet du patient (identitovigilance)      -> EN_TRANSIT
 #   - arrivée : tag NFC mural de la salle de destination            -> TERMINE, agent libéré
 # En urgence vitale, le départ peut être forcé sans scan ; le forçage est tracé dans le journal.
 
 from sqlalchemy.orm import Session
 
-from models.enums import MethodeVerification, NiveauUrgence, StatutAgent, StatutMission
+from models.enums import MethodeVerification, NiveauUrgence, OrigineDetection, StatutAgent, StatutMission
 from models.mission import Mission
 from models.noeud_hopital import NoeudHopital
 from models.patient import Patient
@@ -15,7 +15,7 @@ from models.utilisateur import Brancardier
 from services.assignation_service import (MissionNonProposee, ReponseImpossible,
                                           incrementer_compteur, traiter_file_attente)
 from services.historique_service import changer_statut
-from services.position_service import enregistrer_detection
+from services.position_service import enregistrer_detection, position_actuelle, prouve_la_presence
 
 
 class ScanInvalide(Exception):
@@ -49,8 +49,14 @@ def scanner_depart(db: Session, mission_id: int, agent: Brancardier, tag_nfc: st
         methode = MethodeVerification.FORCE_URGENCE
     else:
         depart = db.get(NoeudHopital, mission.noeud_source_id)
-        if not meme_code(tag_nfc, depart.uid_tag_nfc):
-            raise ScanInvalide(f"Ce tag n'est pas celui du point de départ ({depart.nom_salle})")
+        if tag_nfc:
+            # Tag scanné (secours, ou badge non détecté) : il doit être celui de la salle de départ
+            if not meme_code(tag_nfc, depart.uid_tag_nfc):
+                raise ScanInvalide(f"Ce tag n'est pas celui du point de départ ({depart.nom_salle})")
+        elif not prouve_la_presence(position_actuelle(db, agent.id), depart.id):
+            # Pas de tag : c'est le badge qui doit prouver que l'agent est dans la salle de départ
+            raise ScanInvalide(f"Votre badge n'a pas été détecté au point de départ ({depart.nom_salle}) : "
+                               "scannez le tag de la salle")
         patient = db.get(Patient, mission.patient_id)
         if not meme_code(code_bracelet, patient.code_bracelet):
             raise ScanInvalide("Ce bracelet n'est pas celui du patient de la mission : vérifiez son identité")
@@ -60,7 +66,7 @@ def scanner_depart(db: Session, mission_id: int, agent: Brancardier, tag_nfc: st
     changer_statut(db, mission, StatutMission.EN_TRANSIT, auteur_id=agent.id, methode=methode,
                    agent_id=agent.id)
     # L'agent est au point de départ : sa position est mise à jour
-    enregistrer_detection(db, agent.id, mission.noeud_source_id)
+    enregistrer_detection(db, agent.id, mission.noeud_source_id, OrigineDetection.SCAN)
     db.commit()
     return mission
 
@@ -75,7 +81,7 @@ def scanner_arrivee(db: Session, mission_id: int, agent: Brancardier, tag_nfc: s
 
     changer_statut(db, mission, StatutMission.TERMINE, auteur_id=agent.id,
                    methode=MethodeVerification.BADGE_NFC, agent_id=agent.id)
-    enregistrer_detection(db, agent.id, mission.noeud_destination_id)
+    enregistrer_detection(db, agent.id, mission.noeud_destination_id, OrigineDetection.SCAN)
     # Diagramme : incrementer_compteur_mission (équité de charge pour les prochaines assignations)
     incrementer_compteur(agent)
     agent.statut = StatutAgent.DISPONIBLE
