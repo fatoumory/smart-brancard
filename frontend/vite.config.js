@@ -13,7 +13,8 @@ export default defineConfig(({ mode }) => ({
     host: true,   // accessible depuis le téléphone (adresse IP du PC)
     proxy: {
       // https://<IP du PC>:5173/api/missions  ->  http://localhost:8000/missions
-      '/api': { target: 'http://localhost:8000', changeOrigin: true, rewrite: (chemin) => chemin.replace(/^\/api/, '') },
+      // ws: true : le WebSocket du temps réel (/api/ws) passe aussi par le proxy (wss:// côté téléphone)
+      '/api': { target: 'http://localhost:8000', changeOrigin: true, ws: true, rewrite: (chemin) => chemin.replace(/^\/api/, '') },
     },
   } : undefined,
 

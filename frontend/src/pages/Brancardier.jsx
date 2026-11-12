@@ -11,10 +11,11 @@ import { accepterMission, changerMonStatut, getMaMission, getMonProfil, refuserM
 import { listerNoeuds } from "../services/missionService";
 import { STATUTS_AGENT } from "../services/referentiel";
 
-// Le profil (statut, missions du jour) est relu toutes les 30 s, en attendant les WebSockets du Sprint 4
+// Profil et mission se mettent à jour par le temps réel (WebSocket). Ces rechargements réguliers
+// sont un secours si la connexion temps réel est coupée : la mission reste relue souvent,
+// car une proposition n'attend la réponse que 30 à 60 s
 const INTERVALLE_MS = 30000;
-// La mission est relue plus souvent : une proposition n'attend la réponse que 30 à 60 s
-const INTERVALLE_MISSION_MS = 5000;
+const INTERVALLE_MISSION_MS = 10000;
 
 
 // Barre de navigation du bas (maquette : Mission, Journal, Profil)
@@ -29,11 +30,11 @@ function Brancardier() {
     const [onglet, setOnglet] = useState("mission");
     const [erreurStatut, setErreurStatut] = useState("");
     const [envoi, setEnvoi] = useState(false);
-    const profil = useDonnees(getMonProfil, INTERVALLE_MS);
+    const profil = useDonnees(getMonProfil, INTERVALLE_MS, ["agents"]);
     const moi = profil.donnees;
     const statut = moi && STATUTS_AGENT[moi.statut];
     // Mission proposée, acceptée ou en transit (null si l'agent n'en a pas)
-    const mission = useDonnees(getMaMission, INTERVALLE_MISSION_MS);
+    const mission = useDonnees(getMaMission, INTERVALLE_MISSION_MS, ["missions"]);
     // Mission que l'agent vient de terminer (scan d'arrivée réussi) : confirmation affichée jusqu'à fermeture
     const [missionTerminee, setMissionTerminee] = useState(null);
     // Position de l'agent (balise BLE simulée), envoyée toutes les 2 min quel que soit l'onglet

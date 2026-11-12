@@ -6,8 +6,8 @@ import { useDonnees } from "../hooks/useDonnees";
 import { listerMissions } from "../services/missionService";
 import { formaterHeure } from "../services/referentiel";
 
-// Relue toutes les 10 s pour voir avancer les demandes, en attendant les WebSockets
-const INTERVALLE_MS = 10000;
+// Les demandes avancent en temps réel (WebSocket) ; relues aussi toutes les 30 s si la connexion est coupée
+const INTERVALLE_MS = 30000;
 // Statuts d'une demande pas encore terminée
 const EN_COURS = ["EN_ATTENTE", "PROPOSE", "ACCEPTE", "EN_TRANSIT"];
 // Demandes terminées ou annulées affichées (les plus récentes)
@@ -16,7 +16,7 @@ const NB_TERMINEES = 20;
 // « Mes demandes » : les demandes de transport du médecin connecté, pour retrouver leur suivi
 // après avoir quitté la page. Le serveur ne renvoie au médecin que ses propres demandes (GET /missions).
 function MesDemandes() {
-    const { donnees, erreur, chargement, recharger } = useDonnees(listerMissions, INTERVALLE_MS);
+    const { donnees, erreur, chargement, recharger } = useDonnees(listerMissions, INTERVALLE_MS, ["missions"]);
     const missions = donnees ?? [];
 
     // Le serveur trie par urgence (file du régulateur) ; ici, la plus récente d'abord

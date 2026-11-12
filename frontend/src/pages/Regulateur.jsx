@@ -4,15 +4,18 @@ import CarteIndicateur from "../components/dashboard/CarteIndicateur";
 import FileMissions from "../components/dashboard/FileMissions";
 import AgentsTerrain from "../components/dashboard/AgentsTerrain";
 import ActiviteJour from "../components/dashboard/ActiviteJour";
+import IndicateurTempsReel from "../components/IndicateurTempsReel";
 import { useDonnees } from "../hooks/useDonnees";
 import { listerBrancardiers, listerMissions, listerNoeuds } from "../services/missionService";
 
-// Rafraîchissement automatique toutes les 15 s, en attendant les WebSockets (Sprint 4)
-const INTERVALLE_MS = 15000;
+// Les écrans se mettent à jour par le temps réel (WebSocket) ; ce rechargement toutes les 30 s
+// n'est qu'un secours si la connexion temps réel est coupée
+const INTERVALLE_MS = 30000;
 
 function Regulateur() {
-    const missions = useDonnees(listerMissions, INTERVALLE_MS);
-    const agents = useDonnees(listerBrancardiers, INTERVALLE_MS);
+    // Rechargées dès qu'une mission change (statut, journal) ou qu'un agent change (statut, position)
+    const missions = useDonnees(listerMissions, INTERVALLE_MS, ["missions"]);
+    const agents = useDonnees(listerBrancardiers, INTERVALLE_MS, ["agents"]);
     // Le plan de l'hôpital change rarement : chargé une seule fois
     const noeuds = useDonnees(listerNoeuds);
 
@@ -46,6 +49,7 @@ function Regulateur() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <h1 className="text-2xl font-bold text-slate-900">Opérations</h1>
                     <div className="flex items-center gap-3 text-sm text-slate-500">
+                        <IndicateurTempsReel />
                         {missions.misAJourA && <span>Mis à jour à {missions.misAJourA.toLocaleTimeString("fr-FR")}</span>}
                         <button
                             type="button"
