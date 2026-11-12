@@ -40,6 +40,19 @@ export function rechercherPatients(texte) {
   return apiFetch(`/patients?recherche=${encodeURIComponent(texte)}&limite=10`);
 }
 
+/** Admission d'un patient : l'IPP et le code du bracelet sont générés par le serveur.
+ * { identite_inconnue, nom, prenom, date_naissance, sexe, confirmer_nouveau } -> Patient
+ * Erreur 409 si un patient semblable existe : erreur.detail.patients_similaires */
+export function admettrePatient(donnees) {
+  return apiFetch("/patients", { method: "POST", json: donnees });
+}
+
+/** Identité confirmée d'un patient (remplace une identité provisoire) ; l'IPP et le bracelet ne changent pas.
+ * { nom, prenom, date_naissance, sexe, confirmer_nouveau } -> Patient (409 comme l'admission) */
+export function modifierIdentitePatient(id, donnees) {
+  return apiFetch(`/patients/${id}`, { method: "PATCH", json: donnees });
+}
+
 /** Brancardiers avec leur statut et leur nombre de missions du jour (régulateur uniquement) */
 export function listerBrancardiers() {
   return apiFetch("/utilisateurs?role=BRANCARDIER");
