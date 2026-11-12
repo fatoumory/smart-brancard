@@ -80,8 +80,11 @@ def test_acceptation(client, reg, medecin):
     assert [l["statut_modifie_en"] for l in lignes] == ["EN_ATTENTE", "PROPOSE", "ACCEPTE"]
     assert lignes[-1]["auteur_id"] == agent_id
 
-    # Une seconde réponse n'a plus de sens
-    assert client.put(f"/missions/{m['id']}/accept", headers=entetes).status_code == 409
+    # Une acceptation renvoyée (réponse perdue, action gardée hors ligne) n'est pas comptée deux fois
+    r = client.put(f"/missions/{m['id']}/accept", headers=entetes)
+    assert r.status_code == 200 and r.json()["statut"] == "ACCEPTE"
+    assert len(client.get(f"/missions/{m['id']}/historique", headers=medecin).json()) == 3
+    # Un refus après l'acceptation n'a plus de sens
     assert client.put(f"/missions/{m['id']}/refuse", json={"motif": "FIN_SERVICE"},
                       headers=entetes).status_code == 409
 
