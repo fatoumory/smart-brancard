@@ -33,6 +33,7 @@ pytest==9.1.1
 python-dotenv==1.2.3
 python-jose==3.5.0
 python-multipart==0.0.32
+redis==5.2.1
 rsa==4.9.1
 six==1.17.0
 SQLAlchemy==2.0.52
@@ -40,3 +41,4 @@ starlette==1.6.0
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 uvicorn==0.52.4
+websockets==15.0.1

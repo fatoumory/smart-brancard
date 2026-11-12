@@ -19,16 +19,22 @@ from routes.patient import router as patients_router
 from routes.graphe import router_noeuds as noeuds_router  
 from routes.detection import router as detections_router
 from routes.alerte import router as alertes_router
+from routes.temps_reel import router as temps_reel_router
 from services.taches_fond import INTERVALLE_S, boucle_taches_fond
+from services.temps_reel import diffuseur
 
 
 #  Tâches de fond : démarrées avec l'API, arrêtées avec elle
 @asynccontextmanager
 async def cycle_de_vie(_: FastAPI):
+    # Temps réel : par Redis Pub/Sub si REDIS_URL est renseignée (plusieurs processus du serveur)
+    if os.getenv("REDIS_URL"):
+        await diffuseur.demarrer_redis(os.environ["REDIS_URL"])
     tache = asyncio.create_task(boucle_taches_fond()) if INTERVALLE_S > 0 else None
     yield
     if tache is not None:
         tache.cancel()
+    await diffuseur.arreter()
 
 
 #  Création de l'application FastAPI 
@@ -73,6 +79,7 @@ app.include_router(patients_router)      # /patients/...
 app.include_router(noeuds_router)        # /noeuds/...
 app.include_router(detections_router)    # /detections/...
 app.include_router(alertes_router)       # /alertes/...
+app.include_router(temps_reel_router)    # /ws (WebSocket du temps réel)
 
 #  Route de test 
 @app.get("/")

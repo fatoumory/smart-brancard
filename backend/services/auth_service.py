@@ -106,6 +106,19 @@ def decode_jwt_token(token: str) -> dict | None:
         return None
 
 
+def utilisateur_du_jeton(db: Session, token: str) -> Utilisateur | None:
+    """Utilisateur actif désigné par un JWT valide, sinon None (routes HTTP et WebSocket)"""
+    payload = decode_jwt_token(token)
+    if not payload or not str(payload.get("sub", "")).isdigit():
+        return None
+    # On relit l'utilisateur en base: un compte supprimé ou désactivé n'a plus accès,
+    # même si son token n'a pas encore expiré
+    utilisateur = db.get(Utilisateur, int(payload["sub"]))
+    if utilisateur is None or not utilisateur.est_actif:
+        return None
+    return utilisateur
+
+
 #  Dépendances FastAPI (RBAC) 
 
 def get_current_user(
@@ -119,14 +132,8 @@ def get_current_user(
         detail="Token invalide ou expiré, veuillez vous reconnecter",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    payload = decode_jwt_token(token)
-    if not payload or not str(payload.get("sub", "")).isdigit():
-        raise erreur
-
-    # On relit l'utilisateur en base: un compte supprimé ou désactivé n'a plus accès,
-    # même si son token n'a pas encore expiré
-    utilisateur = db.get(Utilisateur, int(payload["sub"]))
-    if utilisateur is None or not utilisateur.est_actif:
+    utilisateur = utilisateur_du_jeton(db, token)
+    if utilisateur is None:
         raise erreur
     return utilisateur
 
