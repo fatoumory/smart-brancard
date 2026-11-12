@@ -7,8 +7,9 @@ import { useDonnees } from "../hooks/useDonnees";
 import { MissionTerminee } from "../components/brancardier/MissionEnCours";
 import MaPosition from "../components/brancardier/MaPosition";
 import ActiverSon from "../components/brancardier/ActiverSon";
-import { annoncerMission } from "../services/voix";
-import { accepterMission, changerMonStatut, getMaMission, getMonProfil, refuserMission, scannerArrivee, scannerDepart } from "../services/brancardierService";
+import { annoncerMission, parler } from "../services/voix";
+import { accepterMission, appelerRegulateur, changerMonStatut, declarerArrivee, getMaMission, getMonJournal, getMonProfil,
+    refuserMission, scannerArrivee, scannerDepart } from "../services/brancardierService";
 import { STATUTS_AGENT } from "../services/referentiel";
 
 // Profil et mission se mettent à jour par le temps réel (WebSocket). Ces rechargements réguliers
@@ -49,6 +50,27 @@ function Brancardier() {
             annoncerMission(proposee);
         }
     }, [proposee]);
+
+    // Mission en transport : retenue pour reconnaître sa fin quand elle vient du badge
+    // (30 s de présence dans la salle d'arrivée) : la mission disparaît alors de /missions/moi
+    const enTransport = useRef(null);
+    const enCours = mission.donnees;
+    useEffect(() => {
+        if (enCours?.statut === "EN_TRANSIT") {
+            enTransport.current = enCours.id;
+            return;
+        }
+        const id = enTransport.current;
+        if (enCours || id === null) return;
+        enTransport.current = null;
+        // Plus de mission : on retrouve celle qui vient de se terminer dans le journal du jour
+        getMonJournal().then((journal) => {
+            const terminee = journal.find((m) => m.id === id && m.statut === "TERMINE");
+            if (!terminee) return;   // annulée ou réaffectée par le régulateur
+            setMissionTerminee((deja) => deja ?? terminee);
+            parler(`Arrivée détectée en ${terminee.noeud_destination_nom}. Mission terminée.`);
+        }, () => {});
+    }, [enCours]);
 
     // Change le statut sur le serveur, puis relit le profil pour afficher le nouvel état.
     // dureePauseMinutes n'est envoyé que pour une pause (30 ou 45 min) : le serveur en déduit l'heure de fin. Renvoie true si le changement a réussi
@@ -101,11 +123,21 @@ function Brancardier() {
         await scanner(() => scannerDepart(mission.donnees.id, corps));
     }
 
-    // Scan d'arrivée réussi : le serveur renvoie la mission TERMINE, gardée pour la confirmation
-    async function terminerMission(tagNfc) {
-        const terminee = await scanner(() => scannerArrivee(mission.donnees.id, tagNfc));
+    // Fin de mission par l'agent (secours) : la mission TERMINE renvoyée par le serveur est gardée
+    // pour la confirmation. enTransport est vidé : la fin ne doit pas être annoncée une 2e fois.
+    async function finir(appel) {
+        enTransport.current = null;
+        const terminee = await scanner(appel);
         setMissionTerminee(terminee);
+        parler("Mission terminée.");
     }
+
+    // Secours de l'arrivée : scan du tag de la salle, ou bouton « Arrivé »
+    const terminerParScan = (tagNfc) => finir(() => scannerArrivee(mission.donnees.id, tagNfc));
+    const terminerParDeclaration = () => finir(() => declarerArrivee(mission.donnees.id));
+
+    // Appel du régulateur : une alerte s'affiche sur son dashboard
+    const appeler = (raison) => appelerRegulateur(mission.donnees.id, raison);
 
     const titre = ONGLETS.find((o) => o.id === onglet).titre;
     const erreur = erreurStatut || profil.erreur || mission.erreur;
@@ -151,7 +183,9 @@ function Brancardier() {
                         onAccepter={() => repondre(() => accepterMission(mission.donnees.id))}
                         onRefuser={(motif) => repondre(() => refuserMission(mission.donnees.id, motif))}
                         onScanDepart={prendreEnCharge}
-                        onScanArrivee={terminerMission} />
+                        onScanArrivee={terminerParScan}
+                        onArrivee={terminerParDeclaration}
+                        onAppel={appeler} />
                 )}
 
                 {moi && onglet === "journal" && <EcranJournal />}

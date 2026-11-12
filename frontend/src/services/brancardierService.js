@@ -37,7 +37,8 @@ export function refuserMission(id, motif) {
 }
 
 /** Prise en charge au point de départ -> la mission passe EN_TRANSIT.
- *  corps : { tag_nfc, code_bracelet } (tag de la salle + QR du bracelet du patient),
+ *  corps : { code_bracelet } seul quand le badge a prouvé la présence au départ (mission.agent_au_depart),
+ *  { tag_nfc, code_bracelet } en secours (tag de la salle + QR du bracelet du patient),
  *  ou { forcer_urgence: true } pour partir sans scan, réservé aux missions URGENT (tracé dans le journal) */
 export function scannerDepart(id, corps) {
     return apiFetch(`/missions/${id}/scan-depart`, { method: "POST", json: corps });
@@ -46,6 +47,18 @@ export function scannerDepart(id, corps) {
 /** Arrivée : tag NFC de la salle de destination -> la mission passe TERMINE, l'agent redevient disponible */
 export function scannerArrivee(id, tagNfc) {
     return apiFetch(`/missions/${id}/scan-arrivee`, { method: "POST", json: { tag_nfc: tagNfc } });
+}
+
+/** Bouton « Arrivé » (secours) : l'agent déclare l'arrivée quand elle n'a pas été détectée par son badge.
+ *  La mission passe TERMINE (méthode MANUEL au journal) et l'agent redevient disponible */
+export function declarerArrivee(id) {
+    return apiFetch(`/missions/${id}/arrivee`, { method: "POST" });
+}
+
+/** Appel du régulateur pendant une mission (bracelet illisible, échecs de scan...) :
+ *  raison = "BRACELET_ILLISIBLE" | "ECHECS_SCAN" | "AUTRE" ; une alerte s'affiche sur son dashboard */
+export function appelerRegulateur(id, raison) {
+    return apiFetch(`/missions/${id}/appel-regulateur`, { method: "POST", json: { raison } });
 }
 
 /** Missions terminées par l'agent aujourd'hui, de la plus récente à la plus ancienne (onglet Journal) */

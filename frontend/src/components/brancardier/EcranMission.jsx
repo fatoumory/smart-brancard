@@ -30,7 +30,8 @@ function optionsPause() {
 }
 
 // Onglet « Mission » : la mission en cours si l'agent en a une, sinon ce que voit l'agent selon son statut.
-function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onAccepter, onRefuser, onScanDepart, onScanArrivee }) {
+function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onAccepter, onRefuser, onScanDepart, onScanArrivee,
+    onArrivee, onAppel }) {
     const [choixPause, setChoixPause] = useState(false);
 
     // La durée choisie est envoyée au serveur, qui calcule l'heure de fin (fin_pause)
@@ -62,7 +63,7 @@ function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onA
     // Mission acceptée (en route vers le patient) ou en transit : parcours et scans de la mission
     if (mission?.statut === "ACCEPTE" || mission?.statut === "EN_TRANSIT") {
         return <MissionEnCours key={mission.id} mission={mission}
-            onScanDepart={onScanDepart} onScanArrivee={onScanArrivee} />;
+            onScanDepart={onScanDepart} onScanArrivee={onScanArrivee} onArrivee={onArrivee} onAppel={onAppel} />;
     }
 
 
@@ -82,10 +83,13 @@ function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onA
         );
     }
 
+    // En mission sans mission en cours : l'arrivée vient d'être détectée par le badge, l'agent remet
+    // le patient au service. Le serveur le rend disponible dès que son badge est capté ailleurs
+    // (il a quitté la salle), ou au plus tard 10 min après l'arrivée.
     if (moi.statut === "EN_MISSION") {
         return (
-            <Etat icone={Navigation} couleur="text-primaire" fond="bg-primaire-clair" titre="Mission en cours"
-                texte="Les étapes de votre mission s'afficheront ici." />
+            <Etat icone={Navigation} couleur="text-primaire" fond="bg-primaire-clair" titre="Remise du patient"
+                texte="Vous redevenez disponible dès que vous quittez la salle (au plus tard 10 min après l'arrivée)." />
         );
     }
 

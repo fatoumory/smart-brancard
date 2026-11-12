@@ -101,8 +101,9 @@ function ChampScan({ id, libelle, exemple, valeur, onChange, type }) {
     );
 }
 
-// Caméra arrière du téléphone : analyse l'image jusqu'à trouver un QR code, puis s'arrête
-function LecteurQR({ onLu, onFermer }) {
+// Caméra arrière du téléphone : analyse l'image jusqu'à trouver un QR code, puis s'arrête.
+// Exportée : elle sert aussi au scan du bracelet seul (parcours du Sprint 4) et à la carte de connexion.
+export function LecteurQR({ onLu, onFermer }) {
     const video = useRef(null);
     const [erreur, setErreur] = useState("");
     // useEffectEvent : appelle toujours la dernière version de onLu, sans relancer la caméra
