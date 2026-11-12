@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Ban, MapPin, UserRoundCheck } from "lucide-react";
-import { annulerMission, reaffecterMission } from "../../services/missionService";
+import { Ban, FlagTriangleRight, MapPin, UserRoundCheck } from "lucide-react";
+import { annulerMission, cloturerMission, reaffecterMission } from "../../services/missionService";
 
 // Panneau affiché sous une mission quand le régulateur choisit une action du menu « ⋯ » :
 //   type="reaffecter" : choisir un brancardier disponible, à qui la mission est proposée ;
-//   type="annuler"    : confirmer l'annulation.
+//   type="annuler"    : confirmer l'annulation ;
+//   type="cloturer"   : terminer une mission en transit dont l'arrivée n'a pas été détectée.
 // onFait : action réussie (le dashboard relit missions et agents) ; onFermer : abandon.
 function ActionRegulation({ type, mission, agents, onFait, onFermer }) {
     const [choisi, setChoisi] = useState(null);
@@ -22,6 +23,7 @@ function ActionRegulation({ type, mission, agents, onFait, onFermer }) {
         setEnvoi(true);
         try {
             if (type === "reaffecter") await reaffecterMission(mission.id, choisi);
+            else if (type === "cloturer") await cloturerMission(mission.id);
             else await annulerMission(mission.id);
             onFait();
         } catch (err) {
@@ -64,6 +66,14 @@ function ActionRegulation({ type, mission, agents, onFait, onFermer }) {
                         </div>
                     )}
                 </>
+            ) : type === "cloturer" ? (
+                <div>
+                    <p className="font-semibold text-slate-900">Clôturer la mission #{mission.id} ?</p>
+                    <p className="text-sm text-slate-500">
+                        À faire seulement si le patient est bien arrivé en {mission.noeud_destination_nom} (appel du service ou de l'agent).
+                        La clôture est inscrite au journal avec votre nom, et l'agent redevient disponible.
+                    </p>
+                </div>
             ) : (
                 <div>
                     <p className="font-semibold text-slate-900">Annuler la mission #{mission.id} ?</p>
@@ -86,6 +96,11 @@ function ActionRegulation({ type, mission, agents, onFait, onFermer }) {
                     <button type="button" onClick={confirmer} disabled={!choisi || envoi}
                         className="px-4 py-2 rounded-lg bg-primaire text-white font-semibold flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                         <UserRoundCheck className="w-4 h-4" /> Proposer la mission
+                    </button>
+                ) : type === "cloturer" ? (
+                    <button type="button" onClick={confirmer} disabled={envoi}
+                        className="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-semibold flex items-center gap-2 cursor-pointer disabled:opacity-50">
+                        <FlagTriangleRight className="w-4 h-4" /> Confirmer la clôture
                     </button>
                 ) : (
                     <button type="button" onClick={confirmer} disabled={envoi}
