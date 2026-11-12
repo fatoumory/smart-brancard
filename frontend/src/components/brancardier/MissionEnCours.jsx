@@ -203,8 +203,11 @@ function PriseEnCharge({ mission, onValider, onEchec }) {
 
     // Résultat dit à voix haute : l'agent a les mains sur le patient, il n'a pas à lire l'écran
     const { envoi, erreur, envoyer } = useEnvoi(async (corps) => {
-        await onValider(corps);
-        parler(`Bon patient. Direction ${mission.noeud_destination_nom}.`);
+        const resultat = await onValider(corps);
+        // Sans réseau, le bracelet n'a pas encore pu être vérifié par le serveur : on ne dit pas « bon patient »
+        parler(resultat?.horsLigne
+            ? "Scan enregistré sans réseau. Il sera vérifié dès le retour du réseau."
+            : `Bon patient. Direction ${mission.noeud_destination_nom}.`);
     }, (err) => {
         onEchec();
         // « Ce bracelet n'est pas celui du patient de la mission » : alerte claire, sinon le message du serveur

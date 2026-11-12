@@ -7,6 +7,8 @@ import { useDonnees } from "../hooks/useDonnees";
 import { MissionTerminee } from "../components/brancardier/MissionEnCours";
 import MaPosition from "../components/brancardier/MaPosition";
 import ActiverSon from "../components/brancardier/ActiverSon";
+import BandeauHorsLigne from "../components/brancardier/BandeauHorsLigne";
+import { demarrerEnvoisAutomatiques, suivreHorsLigne } from "../services/horsLigne";
 import { annoncerMission, parler } from "../services/voix";
 import { accepterMission, appelerRegulateur, changerMonStatut, declarerArrivee, getMaMission, getMonJournal, getMonProfil,
     refuserMission, scannerArrivee, scannerDepart } from "../services/brancardierService";
@@ -38,6 +40,22 @@ function Brancardier() {
     const mission = useDonnees(getMaMission, INTERVALLE_MISSION_MS, ["missions"]);
     // Mission que l'agent vient de terminer (scan d'arrivée réussi) : confirmation affichée jusqu'à fermeture
     const [missionTerminee, setMissionTerminee] = useState(null);
+    // Mode hors ligne : les actions faites sans réseau partent dès son retour (et toutes les 15 s)
+    useEffect(() => demarrerEnvoisAutomatiques(), []);
+    // Quand la dernière action en attente est partie, on relit la mission et le profil du serveur
+    const { recharger: rechargerMission } = mission;
+    const { recharger: rechargerProfil } = profil;
+    useEffect(() => {
+        let avant = 0;
+        return suivreHorsLigne(({ enAttente }) => {
+            if (avant > 0 && enAttente === 0) {
+                rechargerMission();
+                rechargerProfil();
+            }
+            avant = enAttente;
+        });
+    }, [rechargerMission, rechargerProfil]);
+
     // Dernière mission annoncée : chaque nouvelle proposition n'est annoncée qu'une fois
     const derniereAnnoncee = useRef(null);
 
@@ -120,7 +138,7 @@ function Brancardier() {
 
     // Scan de départ : l'agent est au point de départ (le serveur enregistre aussi cette position)
     async function prendreEnCharge(corps) {
-        await scanner(() => scannerDepart(mission.donnees.id, corps));
+        return scanner(() => scannerDepart(mission.donnees.id, corps));
     }
 
     // Fin de mission par l'agent (secours) : la mission TERMINE renvoyée par le serveur est gardée
@@ -140,7 +158,9 @@ function Brancardier() {
     const appeler = (raison) => appelerRegulateur(mission.donnees.id, raison);
 
     const titre = ONGLETS.find((o) => o.id === onglet).titre;
-    const erreur = erreurStatut || profil.erreur || mission.erreur;
+    // Une simple coupure de réseau est annoncée par le bandeau hors ligne, pas comme une erreur
+    const erreur = erreurStatut || (profil.erreur && !profil.erreur.startsWith("Impossible de contacter") ? profil.erreur : "")
+        || mission.erreur;
 
 
     return (
@@ -168,6 +188,8 @@ function Brancardier() {
 
                 {/* Tant que l'agent n'a pas touché l'écran, le navigateur bloque la sonnerie et la voix */}
                 <ActiverSon />
+                {/* Réseau coupé : la mission reste affichée, les actions attendent le retour du réseau */}
+                <BandeauHorsLigne />
 
                 {/* Position détectée par le badge (simulateur de badges dans le prototype) : l'agent ne la saisit plus */}
                 {moi && onglet === "mission" && <MaPosition />}

@@ -59,6 +59,10 @@ export async function loginApi(email, password) {
 export function logoutApi() {
   localStorage.removeItem("token");
   localStorage.removeItem("role");
+  // Mission gardée et actions en attente du mode hors ligne (services/horsLigne.js) :
+  // rien ne doit rester sur un téléphone partagé après la déconnexion (CDC §7.2)
+  localStorage.removeItem("mission_en_cours");
+  localStorage.removeItem("actions_en_attente");
 }
 
 /**
