@@ -95,7 +95,7 @@ function Medecin() {
 
     return (
         <div className="min-h-screen">
-            <EnTete />
+            <EnTete largeur="max-w-3xl" />
             <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
                 <h1 className="text-2xl font-bold text-slate-900">Demande de transport patient</h1>
                 <p className="text-slate-500 mt-1">Remplissez le formulaire pour créer un ordre de brancardage.</p>
