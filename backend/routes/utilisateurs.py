@@ -9,7 +9,8 @@ from models.mission import Mission
 from models.noeud_hopital import NoeudHopital
 from models.utilisateur import Brancardier, Utilisateur
 from schemas.utilisateur import StatutUpdate, UtilisateurOut
-from services.assignation_service import mettre_en_pause, traiter_file_attente
+from services.assignation_service import (PauseImpossible, mettre_en_pause, traiter_file_attente,
+                                          verifier_pause_possible)
 from services.auth_service import require_role
 from services.position_service import est_recente, positions_actuelles
 
@@ -74,6 +75,11 @@ def changer_mon_statut(
         )
 
     if donnees.statut == StatutAgent.EN_PAUSE:
+        # Il doit rester assez d'agents disponibles pour les urgences
+        try:
+            verifier_pause_possible(db, current_user)
+        except PauseImpossible as e:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from None
         # La fin de la pause est gérée par le serveur, pas par le téléphone
         mettre_en_pause(current_user, donnees.duree_pause_minutes)
     else:

@@ -14,6 +14,7 @@
 # pendant le choix, et un index unique interdit à un agent d'avoir deux missions actives.
 
 import math
+import os
 from datetime import date, datetime, timedelta, timezone
 
 import networkx as nx
@@ -231,7 +232,7 @@ def refuser_mission(db: Session, mission_id: int, agent: Brancardier, motif: Mot
     agent.non_reponses = 0
     if motif == MotifRefus.URGENCE_PRIORITAIRE:
         # Retenu par une autre urgence : il se met en pause, et revient quand il a fini
-        mettre_en_pause(agent)
+        mettre_en_pause(agent, DUREE_RETENUE_URGENCE_MIN)
     elif motif == MotifRefus.MATERIEL_DEFECTUEUX:
         # Son matériel est en cause, pas lui : il reste disponible (il peut en prendre au dépôt).
         # La mission, elle, attend la décision du régulateur (voir bloquee_pour_materiel)
@@ -250,12 +251,41 @@ def refuser_mission(db: Session, mission_id: int, agent: Brancardier, motif: Mot
 
 
 #  Pauses (diagramme : changer_statut, gerer_reprise_service_auto)
+# L'agent choisit quand il part en pause (30 min, ou 45 min pour le repas). Pour qu'il reste
+# toujours quelqu'un pour une urgence, la pause est refusée si elle laisserait moins de
+# MIN_AGENTS_DISPONIBLES agents disponibles. À la fin, le serveur le remet disponible.
 
-DUREE_PAUSE_DEFAUT_MIN = 15
+DUREE_PAUSE_DEFAUT_MIN = 30
+
+# Refus pour « urgence vitale prioritaire » : l'agent est retenu ailleurs, ce n'est pas une
+# vraie pause, il revient plus tôt
+DUREE_RETENUE_URGENCE_MIN = 15
+
+# Réglage de l'hôpital (.env) : nombre d'agents qui doivent rester disponibles (0 = pas de limite)
+MIN_AGENTS_DISPONIBLES = int(os.getenv("MIN_AGENTS_DISPONIBLES", "1"))
+
+
+class PauseImpossible(Exception):
+    """La pause laisserait trop peu d'agents disponibles (message destiné à l'agent)"""
 
 
 def maintenant() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def verifier_pause_possible(db: Session, agent: Brancardier) -> None:
+    """Refuse la pause d'un agent disponible si, sans lui, il resterait moins de
+    MIN_AGENTS_DISPONIBLES agents disponibles. Un agent déjà indisponible ne retire personne."""
+    if agent.statut != StatutAgent.DISPONIBLE or MIN_AGENTS_DISPONIBLES <= 0:
+        return
+    autres = (db.query(func.count(Brancardier.id))
+              .filter(Brancardier.est_actif.is_(True), Brancardier.statut == StatutAgent.DISPONIBLE,
+                      Brancardier.id != agent.id)
+              .scalar())
+    if autres < MIN_AGENTS_DISPONIBLES:
+        raise PauseImpossible(
+            f"Pause impossible pour l'instant : il doit rester au moins {MIN_AGENTS_DISPONIBLES} "
+            f"agent(s) disponible(s). Réessayez dans quelques minutes.")
 
 
 def mettre_en_pause(agent: Brancardier, minutes: int | None = None) -> None:

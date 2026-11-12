@@ -61,31 +61,31 @@ def finir_la_pause(agent_id):
     db.close()
 
 
-def test_pause_avec_duree(client, agent):
+def test_pause_repas_de_45_minutes(client, agent):
     _, entetes = agent
-    r = pause(client, entetes, duree_pause_minutes=10)
+    r = pause(client, entetes, duree_pause_minutes=45)
     assert r.status_code == 200, r.text
     assert r.json()["statut"] == "EN_PAUSE"
     fin = datetime.fromisoformat(r.json()["fin_pause"]).replace(tzinfo=timezone.utc)
     restant = fin - datetime.now(timezone.utc)
-    assert timedelta(minutes=9) < restant <= timedelta(minutes=10)
+    assert timedelta(minutes=44) < restant <= timedelta(minutes=45)
 
 
-def test_pause_par_defaut_15_minutes(client, agent):
+def test_pause_par_defaut_30_minutes(client, agent):
     _, entetes = agent
     fin = datetime.fromisoformat(pause(client, entetes).json()["fin_pause"]).replace(tzinfo=timezone.utc)
-    assert timedelta(minutes=14) < fin - datetime.now(timezone.utc) <= timedelta(minutes=15)
+    assert timedelta(minutes=29) < fin - datetime.now(timezone.utc) <= timedelta(minutes=30)
 
 
-@pytest.mark.parametrize("minutes", [0, 61])
-def test_duree_de_pause_limitee(client, agent, minutes):
+@pytest.mark.parametrize("minutes", [0, 15, 60])
+def test_seulement_30_ou_45_minutes(client, agent, minutes):
     _, entetes = agent
     assert pause(client, entetes, duree_pause_minutes=minutes).status_code == 422
 
 
 def test_pas_de_reprise_avant_la_fin(client, agent):
     agent_id, entetes = agent
-    pause(client, entetes, duree_pause_minutes=10)
+    pause(client, entetes, duree_pause_minutes=30)
     db = SessionLocal()
     assert gerer_reprise_service_auto(db) == 0
     db.close()
@@ -94,7 +94,7 @@ def test_pas_de_reprise_avant_la_fin(client, agent):
 
 def test_reprise_automatique_meme_telephone_eteint(client, reg, agent):
     agent_id, entetes = agent
-    pause(client, entetes, duree_pause_minutes=5)
+    pause(client, entetes, duree_pause_minutes=30)
     # Une demande arrive pendant la pause : personne n'est libre, elle attend
     client.post("/auth/register", json=MEDECIN, headers=reg)
     medecin = login(client, "diallo@test.fr", "medecin123")
@@ -137,6 +137,38 @@ def test_refus_pour_urgence_prioritaire_met_en_pause(client, reg, agent):
 
     statut, fin = lire_agent(agent_id)
     assert statut == StatutAgent.EN_PAUSE and fin is not None
+    # Retenu ailleurs, ce n'est pas une vraie pause : 15 min seulement
+    restant = fin.replace(tzinfo=timezone.utc) - datetime.now(timezone.utc)
+    assert timedelta(minutes=14) < restant <= timedelta(minutes=15)
     # Quand il a fini, il repasse disponible lui-même (ou le serveur le fait à la fin de la pause)
     r = client.patch("/utilisateurs/me/statut", json={"statut": "DISPONIBLE"}, headers=entetes)
     assert r.status_code == 200 and r.json()["fin_pause"] is None
+
+
+@pytest.fixture()
+def minimum_un_agent(monkeypatch):
+    """Réglage de l'hôpital : au moins 1 agent doit rester disponible"""
+    monkeypatch.setattr("services.assignation_service.MIN_AGENTS_DISPONIBLES", 1)
+
+
+def test_pause_refusee_s_il_ne_reste_personne(client, agent, minimum_un_agent):
+    agent_id, entetes = agent   # seul agent disponible
+    r = pause(client, entetes)
+    assert r.status_code == 409 and "au moins 1 agent" in r.json()["detail"]
+    assert lire_agent(agent_id)[0] == StatutAgent.DISPONIBLE
+
+
+def test_pause_acceptee_si_un_collegue_reste_disponible(client, reg, agent, minimum_un_agent):
+    _, entetes = agent
+    collegue = {**AGENT, "nom_utilisateur": "diop@test.fr", "prenom": "Fatou", "nom": "Diop"}
+    client.post("/auth/register", json=collegue, headers=reg)
+    assert pause(client, entetes).status_code == 200
+    # Le collègue est maintenant le dernier disponible : sa pause est refusée
+    assert pause(client, login(client, "diop@test.fr", "brancard123")).status_code == 409
+
+
+def test_un_agent_indisponible_peut_passer_en_pause(client, agent, minimum_un_agent):
+    agent_id, entetes = agent
+    client.patch("/utilisateurs/me/statut", json={"statut": "INDISPONIBLE"}, headers=entetes)
+    # Il ne retire personne de la liste des disponibles
+    assert pause(client, entetes).status_code == 200

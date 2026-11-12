@@ -3,6 +3,7 @@
 # contrôlent ce qui est renvoyé au frontend (jamais le hash du mot de passe)
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -58,8 +59,9 @@ class UtilisateurOut(BaseModel):
 class StatutUpdate(BaseModel):
     """Changement de statut opérationnel d'un brancardier"""
     statut: StatutAgent
-    # Durée de la pause en minutes (seulement pour EN_PAUSE ; 15 min si non précisée)
-    duree_pause_minutes: int | None = Field(default=None, ge=1, le=60)
+    # Durée de la pause en minutes (seulement pour EN_PAUSE) : 30, ou 45 pour le repas ;
+    # 30 min si non précisée
+    duree_pause_minutes: Literal[30, 45] | None = None
 
 
 class Token(BaseModel):
