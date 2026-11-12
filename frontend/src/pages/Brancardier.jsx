@@ -150,10 +150,12 @@ function Brancardier() {
                 {moi && onglet === "profil" && <EcranProfil moi={moi} />}
             </main>
 
-            {/* Barre de navigation du bas : grandes zones faciles à toucher avec le pouce */}
-            <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200"
+            {/* Barre de navigation du bas : grandes zones faciles à toucher avec le pouce.
+                Même largeur que la colonne de l'application, comme l'en-tête :
+                sur un écran plus large (ordinateur de démonstration), elle ne déborde pas. */}
+            <nav className="fixed bottom-0 inset-x-0 max-w-md mx-auto bg-white border-t border-slate-200"
                 style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-                <div className="max-w-md mx-auto grid grid-cols-3">
+                <div className="grid grid-cols-3">
                     {ONGLETS.map((o) => (
                         <button key={o.id} type="button" onClick={() => setOnglet(o.id)}
                             aria-current={onglet === o.id ? "page" : undefined}

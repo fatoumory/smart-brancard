@@ -8,7 +8,9 @@ const NAVIGATION = {
     medecin: { chemin: "/medecin", libelle: "Prescription", icone: Mic },
 };
 
-function EnTete() {
+// largeur : même largeur maximale que le contenu de la page, pour que le logo et l'utilisateur
+// restent alignés sur lui (dashboard large du régulateur, colonne étroite du médecin)
+function EnTete({ largeur = "max-w-7xl" }) {
     const navigate = useNavigate();
     const jeton = lireJeton();
     const role = getRole();
@@ -21,7 +23,7 @@ function EnTete() {
 
     return (
         <header className="bg-white border-b border-slate-200">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+            <div className={`${largeur} mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4`}>
                 {/* Logo */}
                 <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 bg-primaire rounded-xl flex items-center justify-center shrink-0">

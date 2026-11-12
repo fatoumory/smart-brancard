@@ -45,8 +45,8 @@ function SuiviDemande() {
 
     return (
         <div className="min-h-screen">
-            <EnTete />
-            <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-5">
+            <EnTete largeur="max-w-3xl" />
+            <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-5">
                 {erreur && <p className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl">{erreur}</p>}
 
                 {mission && (
