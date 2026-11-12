@@ -7,6 +7,7 @@ import ActiviteJour from "../components/dashboard/ActiviteJour";
 import IndicateurTempsReel from "../components/IndicateurTempsReel";
 import AlertesAppel from "../components/dashboard/AlertesAppel";
 import BandeauSaturation from "../components/dashboard/BandeauSaturation";
+import BlocagesPassages from "../components/dashboard/BlocagesPassages";
 import { useDonnees } from "../hooks/useDonnees";
 import { getSaturation, listerAlertes, listerBrancardiers, listerMissions, listerNoeuds } from "../services/missionService";
 
@@ -108,6 +109,9 @@ function Regulateur() {
                     <AgentsTerrain agents={agents.donnees} erreur={agents.erreur} />
                     <ActiviteJour missions={liste} />
                 </div>
+
+                {/* Ascenseur en panne, couloir fermé : les itinéraires suivants l'évitent */}
+                <BlocagesPassages />
             </main>
         </div>
     );
