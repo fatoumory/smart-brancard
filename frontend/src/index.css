@@ -11,3 +11,10 @@ body {
   background-color: #eef2f6;
   color: #0f172a;
 }
+
+/* Impression de la carte de connexion (page Comptes) : seule la carte sort sur le papier */
+@media print {
+  body * { visibility: hidden; }
+  .zone-impression, .zone-impression * { visibility: visible; }
+  .zone-impression { position: absolute; top: 0; left: 0; }
+}

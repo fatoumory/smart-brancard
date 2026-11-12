@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Activity, ChartColumn, ClipboardList, ClipboardPlus, LogOut, RadioTower, User } from "lucide-react";
+import { Activity, ChartColumn, ClipboardList, ClipboardPlus, LogOut, RadioTower, User, Users } from "lucide-react";
 import { getRole, lireJeton, logoutApi } from "../services/authService";
 
 // Onglets de chaque rôle (maquette : "Dashboard" pour le régulateur, "Prescription" pour le médecin).
@@ -10,6 +10,7 @@ const NAVIGATION = {
         // Plan de l'hôpital où l'on déplace les agents : remplace les badges BLE dans le prototype
         { chemin: "/regulateur/simulateur", libelle: "Simulateur", icone: RadioTower,
             actif: (p) => p.startsWith("/regulateur/simulateur") },
+        { chemin: "/regulateur/comptes", libelle: "Comptes", icone: Users, actif: (p) => p.startsWith("/regulateur/comptes") },
     ],
     medecin: [
         { chemin: "/medecin", libelle: "Prescription", icone: ClipboardPlus, actif: (p) => p === "/medecin" },
@@ -52,7 +53,7 @@ function EnTete({ largeur = "max-w-7xl" }) {
                                 className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl font-semibold text-sm ${
                                     actif ? "bg-primaire-clair text-primaire" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}>
                                 <o.icone className="w-4 h-4 shrink-0" />
-                                <span className={onglets.length > 1 ? "hidden sm:inline" : ""}>{o.libelle}</span>
+                                <span className={onglets.length > 1 ? "hidden md:inline" : ""}>{o.libelle}</span>
                             </Link>
                         );
                     })}

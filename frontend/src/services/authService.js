@@ -54,6 +54,35 @@ export async function loginApi(email, password) {
 }
 
 /**
+ * Connexion du brancardier par sa carte : le code lu dans le QR de la carte est échangé
+ * contre le même jeton de 8 h que le mot de passe (POST /auth/carte).
+ * @param {string} code ex : "SBC-..." (le serveur n'en garde que l'empreinte)
+ * @returns {Promise<object>} { access_token, role } avec le rôle en minuscules
+ */
+export async function loginCarte(code) {
+  let response;
+  try {
+    response = await fetch(`${API_URL}/auth/carte`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+  } catch (error) {
+    throw new Error("Impossible de contacter le serveur. Le backend est-il démarré ?", { cause: error });
+  }
+  // 401 : carte inconnue ou remplacée par une nouvelle ; 403 : compte désactivé
+  if (response.status === 401) throw new Error("Carte non reconnue : elle a peut-être été remplacée. Voyez le régulateur.");
+  if (response.status === 403) throw new Error("Ce compte est désactivé. Voyez le régulateur.");
+  if (!response.ok) throw new Error(`Erreur serveur (${response.status}). Veuillez réessayer.`);
+
+  const data = await response.json();
+  const role = data.role.toLowerCase();
+  localStorage.setItem("token", data.access_token);
+  localStorage.setItem("role", role);
+  return { ...data, role };
+}
+
+/**
  * Déconnecte l'utilisateur : purge le token et le rôle (aucune trace sur le terminal)
  */
 export function logoutApi() {
