@@ -27,7 +27,7 @@ from models.historique import Historique
 from models.mission import Mission
 from models.utilisateur import Brancardier
 from services.graphe_service import construire_graphe
-from services.historique_service import changer_statut
+from services.historique_service import changer_statut, verifier_horodatage_client
 from services.position_service import en_utc, positions_actuelles
 
 # Ordre de traitement de la file : les plus urgentes d'abord, puis les plus anciennes
@@ -200,35 +200,62 @@ class ReponseImpossible(Exception):
     """La mission n'attend plus de réponse (déjà acceptée, annulée, réaffectée...)"""
 
 
+class DejaFait(Exception):
+    """L'action a déjà été enregistrée pour cet agent : le téléphone la renvoie (réponse perdue,
+    action gardée hors ligne). On renvoie la mission telle quelle, sans nouvelle ligne au journal."""
+
+    def __init__(self, mission: Mission):
+        super().__init__()
+        self.mission = mission
 
 
-def mission_proposee_a(db: Session, mission_id: int, agent: Brancardier) -> Mission:
-    """Verrouille la mission et vérifie qu'elle est proposée à cet agent et attend sa réponse"""
+# Statuts atteints après l'acceptation : une acceptation renvoyée est alors déjà faite
+APRES_ACCEPTATION = {StatutMission.ACCEPTE, StatutMission.EN_TRANSIT, StatutMission.TERMINE}
+
+
+def mission_proposee_a(db: Session, mission_id: int, agent: Brancardier,
+                       deja_fait: set[StatutMission] | None = None) -> Mission:
+    """Verrouille la mission et vérifie qu'elle est proposée à cet agent et attend sa réponse.
+    deja_fait : statuts où l'action de cet agent est déjà enregistrée (lève DejaFait)"""
     mission = db.query(Mission).filter(Mission.id == mission_id).with_for_update().one_or_none()
     if mission is None or mission.brancardier_id != agent.id:
         raise MissionNonProposee()
+    if deja_fait and mission.statut in deja_fait:
+        raise DejaFait(mission)
     if mission.statut != StatutMission.PROPOSE:
         raise ReponseImpossible()
     return mission
 
 
-def accepter_mission(db: Session, mission_id: int, agent: Brancardier) -> Mission:
+def accepter_mission(db: Session, mission_id: int, agent: Brancardier,
+                     horodatage_client: datetime | None = None) -> Mission:
     """L'agent accepte : la mission passe ACCEPTE (il rejoint le patient), l'agent reste EN_MISSION.
-    L'acceptation est une décision explicite de l'agent, tracée dans le journal (CDC §7.3)."""
-    mission = mission_proposee_a(db, mission_id, agent)
-    changer_statut(db, mission, StatutMission.ACCEPTE, auteur_id=agent.id, agent_id=agent.id)
+    L'acceptation est une décision explicite de l'agent, tracée dans le journal (CDC §7.3).
+    Une acceptation renvoyée (déjà enregistrée) renvoie la mission sans rien changer."""
+    try:
+        mission = mission_proposee_a(db, mission_id, agent, deja_fait=APRES_ACCEPTATION)
+    except DejaFait as e:
+        db.commit()   # rien n'a changé : on libère seulement le verrou
+        return e.mission
+    heure = verifier_horodatage_client(horodatage_client, mission)
+    changer_statut(db, mission, StatutMission.ACCEPTE, auteur_id=agent.id, agent_id=agent.id,
+                   horodatage_client=heure)
     agent.non_reponses = 0
     db.commit()
     return mission
 
 
-def refuser_mission(db: Session, mission_id: int, agent: Brancardier, motif: MotifRefus) -> Mission:
+def refuser_mission(db: Session, mission_id: int, agent: Brancardier, motif: MotifRefus,
+                    horodatage_client: datetime | None = None) -> Mission:
     """L'agent refuse avec un motif : la mission retourne en attente et sera proposée à un autre agent.
-    Le refus est tracé avec son motif ; il exclut l'agent des prochaines propositions de cette mission."""
+    Le refus est tracé avec son motif ; il exclut l'agent des prochaines propositions de cette mission.
+    Un refus renvoyé alors que la mission est déjà repartie est rejeté (404) : il n'est pas compté
+    deux fois."""
     mission = mission_proposee_a(db, mission_id, agent)
+    heure = verifier_horodatage_client(horodatage_client, mission)
     mission.brancardier_id = None
     changer_statut(db, mission, StatutMission.EN_ATTENTE, auteur_id=agent.id, motif_refus=motif,
-                   agent_id=agent.id)
+                   agent_id=agent.id, horodatage_client=heure)
     agent.non_reponses = 0
     if motif == MotifRefus.URGENCE_PRIORITAIRE:
         # Retenu par une autre urgence : il se met en pause, et revient quand il a fini

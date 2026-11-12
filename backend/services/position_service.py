@@ -45,6 +45,18 @@ def prouve_la_presence(detection: Detection | None, noeud_id: int, instant: date
             and en_utc(detection.date_heure) >= (instant or datetime.now(timezone.utc)) - PRESENCE_RECENTE)
 
 
+def etait_present(db: Session, brancardier_id: int, noeud_id: int, instant: datetime | None = None) -> bool:
+    """L'agent était dans ce lieu à cet instant (maintenant par défaut) : sa dernière détection
+    à cet instant le prouve. Pour une action faite hors ligne, on regarde où il était quand il
+    l'a faite, pas quand le réseau est revenu (il a pu changer de salle entre-temps)."""
+    instant = instant or datetime.now(timezone.utc)
+    detection = (db.query(Detection)
+                 .filter(Detection.brancardier_id == brancardier_id, Detection.date_heure <= instant)
+                 .order_by(Detection.date_heure.desc(), Detection.id.desc())
+                 .first())
+    return prouve_la_presence(detection, noeud_id, instant)
+
+
 def enregistrer_detection(db: Session, brancardier_id: int, noeud_id: int,
                           origine: OrigineDetection = OrigineDetection.DECLARATION) -> Detection:
     """Enregistre le passage d'un agent près d'une balise (diagramme : enregistrer_ping_ble).

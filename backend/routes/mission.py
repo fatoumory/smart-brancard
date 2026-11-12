@@ -13,14 +13,14 @@ from models.noeud_hopital import NoeudHopital
 from models.patient import Patient
 from models.utilisateur import Brancardier, Utilisateur
 from schemas.alerte import AlerteOut, AppelRegulateur
-from schemas.mission import (HistoriqueOut, MissionCreate, MissionOut, Reaffectation, RefusMission,
-                             ScanArrivee, ScanDepart)
+from schemas.mission import (ActionHorsLigne, HistoriqueOut, MissionCreate, MissionOut, Reaffectation,
+                             RefusMission, ScanArrivee, ScanDepart)
 from services.alerte_service import MissionPasEnCours, MissionSansAgent, appeler_regulateur, vers_alertes_out
 from services.auth_service import require_role
 from services.graphe_service import ItineraireIntrouvable, calculer_itineraire
 from services.assignation_service import (MissionNonProposee, ReponseImpossible, accepter_mission,
                                          refuser_mission, traiter_file_attente)
-from services.historique_service import changer_statut, historique_de
+from services.historique_service import HorodatageInvalide, changer_statut, historique_de
 from services.regulation_service import (ActionImpossible, MissionIntrouvable, annuler_mission,
                                         cloturer_mission, reaffecter_manuellement)
 from services.scan_service import ScanInvalide, declarer_arrivee, scanner_arrivee, scanner_depart
@@ -145,6 +145,7 @@ def lire_historique(
         brancardier_id=l.brancardier_id,
         methode_verification=l.methode_verification,
         motif_refus=l.motif_refus,
+        horodatage_client=l.horodatage_client,
     ) for l in lignes]
 
 
@@ -239,18 +240,29 @@ def erreur_reponse(e: Exception) -> HTTPException:
                          detail="Cette mission n'attend plus de réponse")
 
 
+def erreur_horodatage(e: HorodatageInvalide) -> HTTPException:
+    """Heure d'une action hors ligne incohérente (future, trop ancienne, avant la mission)"""
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e))
+
+
 # Acceptation : la mission passe ACCEPTE, l'agent rejoint le patient
+# Corps facultatif : {"horodatage_client": "..."} pour une acceptation faite hors ligne
 @router.put("/{mission_id}/accept", response_model=MissionOut)
 def accepter(
     mission_id: int,
+    donnees: ActionHorsLigne | None = None,
     db: Session = Depends(get_db),
     current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
 ):
     try:
-        mission = accepter_mission(db, mission_id, current_user)
+        mission = accepter_mission(db, mission_id, current_user,
+                                   donnees.horodatage_client if donnees else None)
     except (MissionNonProposee, ReponseImpossible) as e:
         db.rollback()
         raise erreur_reponse(e) from None
+    except HorodatageInvalide as e:
+        db.rollback()
+        raise erreur_horodatage(e) from None
     return vers_mission_out(db, mission)
 
 
@@ -263,10 +275,13 @@ def refuser(
     current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
 ):
     try:
-        mission = refuser_mission(db, mission_id, current_user, donnees.motif)
+        mission = refuser_mission(db, mission_id, current_user, donnees.motif, donnees.horodatage_client)
     except (MissionNonProposee, ReponseImpossible) as e:
         db.rollback()
         raise erreur_reponse(e) from None
+    except HorodatageInvalide as e:
+        db.rollback()
+        raise erreur_horodatage(e) from None
     return vers_mission_out(db, mission)
 
 
@@ -293,10 +308,13 @@ def scan_depart(
 ):
     try:
         mission = scanner_depart(db, mission_id, current_user, donnees.tag_nfc,
-                                 donnees.code_bracelet, donnees.forcer_urgence)
+                                 donnees.code_bracelet, donnees.forcer_urgence, donnees.horodatage_client)
     except (MissionNonProposee, ReponseImpossible, ScanInvalide) as e:
         db.rollback()
         raise erreur_scan(e, "prise en charge") from None
+    except HorodatageInvalide as e:
+        db.rollback()
+        raise erreur_horodatage(e) from None
     return vers_mission_out(db, mission)
 
 
@@ -309,10 +327,13 @@ def scan_arrivee(
     current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
 ):
     try:
-        mission = scanner_arrivee(db, mission_id, current_user, donnees.tag_nfc)
+        mission = scanner_arrivee(db, mission_id, current_user, donnees.tag_nfc, donnees.horodatage_client)
     except (MissionNonProposee, ReponseImpossible, ScanInvalide) as e:
         db.rollback()
         raise erreur_scan(e, "arrivée") from None
+    except HorodatageInvalide as e:
+        db.rollback()
+        raise erreur_horodatage(e) from None
     return vers_mission_out(db, mission)
 
 
@@ -340,14 +361,19 @@ def appel_regulateur(
 @router.post("/{mission_id}/arrivee", response_model=MissionOut)
 def arrivee_declaree(
     mission_id: int,
+    donnees: ActionHorsLigne | None = None,
     db: Session = Depends(get_db),
     current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
 ):
     try:
-        mission = declarer_arrivee(db, mission_id, current_user)
+        mission = declarer_arrivee(db, mission_id, current_user,
+                                   donnees.horodatage_client if donnees else None)
     except (MissionNonProposee, ReponseImpossible) as e:
         db.rollback()
         raise erreur_scan(e, "arrivée") from None
+    except HorodatageInvalide as e:
+        db.rollback()
+        raise erreur_horodatage(e) from None
     return vers_mission_out(db, mission)
 
 

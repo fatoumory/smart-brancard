@@ -28,12 +28,19 @@ class MissionCreate(BaseModel):
             raise ValueError("Le départ et l'arrivée doivent être différents")
         return self
 
-class RefusMission(BaseModel):
+class ActionHorsLigne(BaseModel):
+    """Champ commun aux actions de l'agent que le téléphone peut garder hors ligne
+    (ascenseur, sous-sol) et envoyer au retour du réseau : l'heure où l'action a été faite.
+    Absent : l'action vient d'être faite. Corps facultatif de accept et de arrivee."""
+    horodatage_client: datetime | None = None
+
+
+class RefusMission(ActionHorsLigne):
     """Corps de PUT /missions/{id}/refuse : le motif est obligatoire (CDC §7.3)"""
     motif: MotifRefus
 
 
-class ScanDepart(BaseModel):
+class ScanDepart(ActionHorsLigne):
     """Corps de POST /missions/{id}/scan-depart : QR du bracelet, et tag NFC de la salle
     seulement si le badge de l'agent n'a pas été détecté au point de départ (secours).
     forcer_urgence=true : prise en charge sans scan, réservée aux missions URGENT (tracée)."""
@@ -42,7 +49,7 @@ class ScanDepart(BaseModel):
     forcer_urgence: bool = False
 
 
-class ScanArrivee(BaseModel):
+class ScanArrivee(ActionHorsLigne):
     """Corps de POST /missions/{id}/scan-arrivee : tag NFC de la salle de destination"""
     tag_nfc: str = Field(min_length=1, max_length=100)
 
@@ -64,6 +71,8 @@ class HistoriqueOut(BaseModel):
     brancardier_id: int | None = None
     methode_verification: MethodeVerification
     motif_refus: MotifRefus | None
+    # Action faite hors ligne : heure réelle donnée par le téléphone (horodatage = réception)
+    horodatage_client: datetime | None = None
 
 class MissionOut(BaseModel):
     """Mission renvoyée au frontend, avec les noms utiles à l'affichage"""

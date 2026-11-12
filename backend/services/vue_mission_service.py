@@ -77,10 +77,11 @@ def construire_missions_out(db: Session, missions: list[Mission]) -> list[Missio
         assignation_auto = (derniere_proposition.auteur_id is None
                             if m.brancardier_id is not None and derniere_proposition else None)
 
-        # Horodatages des étapes clés (journal d'audit)
-        prise = next((en_utc(l.horodatage) for l in lignes
+        # Horodatages des étapes clés (journal d'audit). Pour une action faite hors ligne,
+        # c'est l'heure réelle donnée par le téléphone (déjà vérifiée) qui compte
+        prise = next((en_utc(l.horodatage_client or l.horodatage) for l in lignes
                       if l.statut_modifie_en == StatutMission.EN_TRANSIT), None)
-        fin = next((en_utc(l.horodatage) for l in reversed(lignes)
+        fin = next((en_utc(l.horodatage_client or l.horodatage) for l in reversed(lignes)
                     if l.statut_modifie_en in (StatutMission.TERMINE, StatutMission.ANNULE)), None)
 
         # Délai garanti respecté ? Connu à la prise en charge, ou dès qu'il est dépassé
