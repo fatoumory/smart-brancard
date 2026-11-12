@@ -59,6 +59,8 @@ class MethodeVerification(str, Enum):
     BADGE_NFC = "BADGE_NFC"
     COMMANDE_VOCALE = "COMMANDE_VOCALE"
     FORCE_URGENCE = "FORCE_URGENCE"
+    # Arrivée prouvée par la présence du badge dans la salle de destination (30 s au moins)
+    BALISE = "BALISE"
 
 
 class OrigineDetection(str, Enum):

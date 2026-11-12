@@ -10,6 +10,7 @@ import os
 from database import SessionLocal
 from services.assignation_service import (gerer_propositions_expirees, gerer_reprise_service_auto,
                                           traiter_file_attente)
+from services.badge_service import liberer_agents_apres_mission
 
 journal = logging.getLogger("smart_brancard.taches_fond")
 
@@ -27,6 +28,10 @@ def executer_taches_periodiques() -> None:
         repris = gerer_reprise_service_auto(db)
         if repris:
             journal.info("%s agent(s) remis disponible(s) en fin de pause", repris)
+        # Agents restés occupés 10 min après une arrivée détectée par badge (remise du patient)
+        liberes = liberer_agents_apres_mission(db)
+        if liberes:
+            journal.info("%s agent(s) libéré(s) après la remise d'un patient", liberes)
         # Missions en attente dont une exclusion vient de tomber (5 min après un refus ou une non-réponse)
         proposees = traiter_file_attente(db)
         if proposees:
