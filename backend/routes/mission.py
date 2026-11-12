@@ -12,8 +12,10 @@ from models.mission import Mission
 from models.noeud_hopital import NoeudHopital
 from models.patient import Patient
 from models.utilisateur import Brancardier, Utilisateur
+from schemas.alerte import AlerteOut, AppelRegulateur
 from schemas.mission import (HistoriqueOut, MissionCreate, MissionOut, Reaffectation, RefusMission,
                              ScanArrivee, ScanDepart)
+from services.alerte_service import MissionPasEnCours, MissionSansAgent, appeler_regulateur, vers_alertes_out
 from services.auth_service import require_role
 from services.graphe_service import ItineraireIntrouvable, calculer_itineraire
 from services.assignation_service import (MissionNonProposee, ReponseImpossible, accepter_mission,
@@ -312,6 +314,26 @@ def scan_arrivee(
         db.rollback()
         raise erreur_scan(e, "arrivée") from None
     return vers_mission_out(db, mission)
+
+
+# Appel du régulateur par l'agent bloqué : bracelet illisible, plusieurs scans refusés...
+# Exemple : {"raison": "BRACELET_ILLISIBLE"}. Un second appel pour la même mission ne crée pas de doublon.
+@router.post("/{mission_id}/appel-regulateur", response_model=AlerteOut, status_code=status.HTTP_201_CREATED)
+def appel_regulateur(
+    mission_id: int,
+    donnees: AppelRegulateur,
+    db: Session = Depends(get_db),
+    current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
+):
+    try:
+        alerte = appeler_regulateur(db, mission_id, current_user, donnees.raison)
+    except MissionSansAgent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Cette mission ne vous est pas attribuée") from None
+    except MissionPasEnCours:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="La mission n'est pas en cours : rien à signaler au régulateur") from None
+    return vers_alertes_out(db, [alerte])[0]
 
 
 # Bouton « Arrivé » : clôture par l'agent quand son badge n'a pas été détecté à l'arrivée (secours)

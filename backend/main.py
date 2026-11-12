@@ -18,6 +18,7 @@ from routes.mission import router as missions_router
 from routes.patient import router as patients_router
 from routes.graphe import router_noeuds as noeuds_router  
 from routes.detection import router as detections_router
+from routes.alerte import router as alertes_router
 from services.taches_fond import INTERVALLE_S, boucle_taches_fond
 
 
@@ -71,6 +72,7 @@ app.include_router(missions_router)      #/missions/
 app.include_router(patients_router)      # /patients/...
 app.include_router(noeuds_router)        # /noeuds/...
 app.include_router(detections_router)    # /detections/...
+app.include_router(alertes_router)       # /alertes/...
 
 #  Route de test 
 @app.get("/")

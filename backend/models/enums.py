@@ -72,6 +72,13 @@ class OrigineDetection(str, Enum):
     DECLARATION = "DECLARATION"
 
 
+class RaisonAppel(str, Enum):
+    # Pourquoi un agent appelle le régulateur pendant une mission
+    ECHECS_SCAN = "ECHECS_SCAN"                  # plusieurs scans du bracelet refusés
+    BRACELET_ILLISIBLE = "BRACELET_ILLISIBLE"    # bracelet abîmé, absent ou illisible
+    AUTRE = "AUTRE"
+
+
 class MotifRefus(str, Enum):
     MATERIEL_DEFECTUEUX = "MATERIEL_DEFECTUEUX"
     INDISPONIBILITE_PHYSIQUE = "INDISPONIBILITE_PHYSIQUE"
