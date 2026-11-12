@@ -73,6 +73,11 @@ class Token(BaseModel):
     role: Role
 
 
+class ActivationCompte(BaseModel):
+    """Corps de PATCH /utilisateurs/{id} : désactiver (false) ou réactiver (true) un compte"""
+    est_actif: bool
+
+
 class CarteConnexion(BaseModel):
     """Corps de POST /auth/carte : le code lu dans le QR de la carte"""
     code: str = Field(min_length=1, max_length=200)

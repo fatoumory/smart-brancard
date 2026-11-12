@@ -8,10 +8,11 @@ from models.enums import Role, StatutAgent, StatutMission
 from models.mission import Mission
 from models.noeud_hopital import NoeudHopital
 from models.utilisateur import Brancardier, Utilisateur
-from schemas.utilisateur import CarteOut, StatutUpdate, UtilisateurOut
+from schemas.utilisateur import ActivationCompte, CarteOut, StatutUpdate, UtilisateurOut
 from services.assignation_service import (PauseImpossible, mettre_en_pause, traiter_file_attente,
                                           verifier_pause_possible)
 from services.auth_service import nouvelle_carte, require_role
+from services.compte_service import CompteIntrouvable, DesactivationImpossible, changer_activation
 from services.position_service import est_recente, positions_actuelles
 
 # Préfixe commun à toutes les routes de ce fichier: /utilisateurs/...
@@ -47,6 +48,24 @@ def lister_utilisateurs(
             sortie.position_recente = est_recente(detection)
         resultat.append(sortie)
     return resultat
+
+
+#  Désactivation ou réactivation d'un compte (régulateur)
+# Exemple : {"est_actif": false} quand un agent quitte l'hôpital. Le compte n'est jamais supprimé.
+@router.patch("/{utilisateur_id}", response_model=UtilisateurOut)
+def activer_ou_desactiver(
+    utilisateur_id: int,
+    donnees: ActivationCompte,
+    db: Session = Depends(get_db),
+    current_user: Utilisateur = Depends(require_role([Role.REGULATEUR]))
+):
+    try:
+        return changer_activation(db, utilisateur_id, donnees.est_actif, current_user)
+    except CompteIntrouvable:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur introuvable") from None
+    except DesactivationImpossible as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from None
 
 
 #  Carte de connexion d'un brancardier (régulateur)
