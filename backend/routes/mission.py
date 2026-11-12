@@ -14,7 +14,7 @@ from models.patient import Patient
 from models.utilisateur import Brancardier, Utilisateur
 from schemas.alerte import AlerteOut, AppelRegulateur
 from schemas.mission import (ActionHorsLigne, HistoriqueOut, MissionCreate, MissionOut, Reaffectation,
-                             RefusMission, ScanArrivee, ScanDepart)
+                             RefusMission, SaturationOut, ScanArrivee, ScanDepart)
 from services.alerte_service import MissionPasEnCours, MissionSansAgent, appeler_regulateur, vers_alertes_out
 from services.auth_service import require_role
 from services.graphe_service import ItineraireIntrouvable, calculer_itineraire
@@ -23,6 +23,7 @@ from services.assignation_service import (MissionNonProposee, ReponseImpossible,
 from services.historique_service import HorodatageInvalide, changer_statut, historique_de
 from services.regulation_service import (ActionImpossible, MissionIntrouvable, annuler_mission,
                                         cloturer_mission, reaffecter_manuellement)
+from services.saturation_service import etat_de_la_flotte
 from services.scan_service import ScanInvalide, declarer_arrivee, scanner_arrivee, scanner_depart
 from services.vue_mission_service import construire_missions_out
 
@@ -218,6 +219,16 @@ def lister_missions(
     missions = requete.order_by(ORDRE_URGENCE, Mission.date_creation, Mission.id).limit(limite).all()
     return construire_missions_out(db, missions)
 
+
+
+#  Saturation de la flotte (bandeau « Saturation flotte » du dashboard, CDC §5.4)
+# Déclarée avant /{mission_id} : sinon « saturation » serait lu comme un numéro de mission
+@router.get("/saturation", response_model=SaturationOut)
+def saturation(
+    db: Session = Depends(get_db),
+    _: Utilisateur = Depends(require_role([Role.REGULATEUR]))
+):
+    return etat_de_la_flotte(db)
 
 #  Détail d'une mission (suivi de la demande)
 @router.get("/{mission_id}", response_model=MissionOut)

@@ -18,25 +18,17 @@ import os
 from datetime import date, datetime, timedelta, timezone
 
 import networkx as nx
-from sqlalchemy import case, func
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from models.enums import MotifRefus, NiveauUrgence, StatutAgent, StatutMission
+from models.enums import DELAI_GARANTI_MIN, MotifRefus, NiveauUrgence, StatutAgent, StatutMission
 from models.historique import Historique
 from models.mission import Mission
 from models.utilisateur import Brancardier
 from services.graphe_service import construire_graphe
 from services.historique_service import changer_statut, verifier_horodatage_client
 from services.position_service import en_utc, positions_actuelles
-
-# Ordre de traitement de la file : les plus urgentes d'abord, puis les plus anciennes
-ORDRE_URGENCE = case(
-    {NiveauUrgence.URGENT: 0, NiveauUrgence.HAUTE: 1,
-     NiveauUrgence.MOYENNE: 2, NiveauUrgence.BASSE: 3},
-    value=Mission.niveau_urgence,
-)
-
 
 #  Compteur de missions du jour (diagramme : reinitialiser_compteur_journalier)
 
@@ -170,15 +162,33 @@ def assigner_automatiquement(db: Session, mission_id: int) -> Brancardier | None
     return agent
 
 
+#  Ordre de la file d'attente, avec vieillissement (CDC §5.4)
+# Trier seulement par urgence ferait attendre sans fin une mission BASSE dès que la flotte est chargée.
+# On sert donc d'abord la mission la plus proche de dépasser son délai garanti (3, 8, 15 ou 30 min) :
+# une mission BASSE qui attend depuis 25 min (échéance dans 5 min) passe avant une MOYENNE
+# qui vient d'arriver (échéance dans 15 min). Elle « vieillit » et gagne sa place.
+# Exception : l'URGENT (urgence vitale) passe toujours en premier, quelle que soit l'attente des autres.
+
+def echeance(mission: Mission) -> datetime:
+    """Heure à laquelle la mission dépasse son délai garanti de prise en charge"""
+    return en_utc(mission.date_creation) + timedelta(minutes=DELAI_GARANTI_MIN[mission.niveau_urgence])
+
+
+def cle_de_file(mission: Mission) -> tuple:
+    """Clé de tri de la file : URGENT d'abord, puis l'échéance la plus proche, puis la plus ancienne"""
+    return (mission.niveau_urgence != NiveauUrgence.URGENT, echeance(mission), mission.id)
+
+
+def missions_en_attente(db: Session) -> list[Mission]:
+    """Missions en attente d'un agent, dans l'ordre où elles seront servies"""
+    return sorted(db.query(Mission).filter(Mission.statut == StatutMission.EN_ATTENTE).all(), key=cle_de_file)
+
+
 def traiter_file_attente(db: Session) -> int:
-    """Propose les missions en attente aux agents libres, les plus urgentes et anciennes d'abord.
+    """Propose les missions en attente aux agents libres, dans l'ordre de la file (voir cle_de_file).
     À appeler après une création de mission, un refus, ou quand un agent redevient disponible.
     Renvoie le nombre de missions proposées."""
-    en_attente = [m_id for (m_id,) in
-                  db.query(Mission.id)
-                  .filter(Mission.statut == StatutMission.EN_ATTENTE)
-                  .order_by(ORDRE_URGENCE, Mission.date_creation, Mission.id)
-                  .all()]
+    en_attente = [m.id for m in missions_en_attente(db)]
     proposees = 0
     for mission_id in en_attente:
         if assigner_automatiquement(db, mission_id) is not None:

@@ -133,3 +133,17 @@ class MissionOut(BaseModel):
     # alerte pour le régulateur, qui peut réaffecter sans attendre la fin des exclusions (5 min)
     sans_candidat: bool = False
 
+
+
+#  État de la flotte (alerte « Saturation flotte » du dashboard)
+class SaturationOut(BaseModel):
+    # True : trop de missions en attente pour les agents disponibles
+    sature: bool
+    missions_en_attente: int
+    # Missions qui ont déjà dépassé leur délai garanti de prise en charge
+    missions_en_retard: int
+    agents_disponibles: int
+    # Seuil réglé dans le .env (SEUIL_SATURATION)
+    seuil: int
+    # Identifiants des missions en attente, dans l'ordre où elles seront servies
+    file: list[int]
