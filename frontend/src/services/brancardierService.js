@@ -57,11 +57,3 @@ export function getMonJournal() {
 export function getMaPosition() {
     return apiFetch("/detections/me");
 }
-
-/** Balise BLE simulée : signale au serveur que l'agent se trouve au lieu noeudId.
- *  C'est cette position qui permet de proposer les missions à l'agent le plus proche (CDC §5.3) */
-export function signalerPosition(noeudId) {
-    return apiFetch("/detections", { method: "POST", json: { noeud_id: noeudId } });
-}
-
-

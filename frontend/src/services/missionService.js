@@ -68,3 +68,57 @@ export function reaffecterMission(id, brancardierId) {
 export function annulerMission(id) {
   return apiFetch(`/missions/${id}/annuler`, { method: "PUT" });
 }
+
+/** Régulateur : clôture d'une mission en transit dont l'arrivée n'a pas été détectée
+ *  (badge muet, téléphone de l'agent éteint). Tracée au journal avec son nom ; l'agent redevient disponible */
+export function cloturerMission(id) {
+  return apiFetch(`/missions/${id}/cloturer`, { method: "PUT" });
+}
+
+/** État de la flotte : { sature, missions_en_attente, missions_en_retard, agents_disponibles, seuil, file } */
+export function getSaturation() {
+  return apiFetch("/missions/saturation");
+}
+
+/** Appels des agents au régulateur (bracelet illisible, échecs de scan...) ; traitee=false : à traiter */
+export function listerAlertes(traitee) {
+  return apiFetch(traitee === undefined ? "/alertes" : `/alertes?traitee=${traitee}`);
+}
+
+/** Le régulateur a pris en charge l'appel : l'alerte disparaît du dashboard */
+export function traiterAlerte(id) {
+  return apiFetch(`/alertes/${id}/traiter`, { method: "PUT" });
+}
+
+/** Passages de l'hôpital (couloirs, ascenseurs) avec leur état ouvert ou bloqué */
+export function listerAretes() {
+  return apiFetch("/aretes");
+}
+
+/** Bloque (panne, fermeture) ou rouvre un passage : les itinéraires suivants l'évitent */
+export function bloquerArete(id, estBloque) {
+  return apiFetch(`/aretes/${id}`, { method: "PATCH", json: { est_bloque: estBloque } });
+}
+
+/** Simulateur de badges (régulateur) : le récepteur de la salle noeudId a capté le badge de l'agent.
+ *  C'est ce qu'enverrait un vrai récepteur ESP32 ; le serveur en déduit l'arrivée au départ,
+ *  l'arrivée à destination (30 s de présence) et la sortie de la salle */
+export function detecterBadge(brancardierId, noeudId) {
+  return apiFetch("/detections/badge", { method: "POST", json: { brancardier_id: brancardierId, noeud_id: noeudId } });
+}
+
+/** Tous les comptes (régulateur) : médecins, régulateurs et brancardiers */
+export function listerUtilisateurs() {
+  return apiFetch("/utilisateurs");
+}
+
+/** Désactive (false) ou réactive (true) un compte ; il n'est jamais supprimé */
+export function changerActivation(id, estActif) {
+  return apiFetch(`/utilisateurs/${id}`, { method: "PATCH", json: { est_actif: estActif } });
+}
+
+/** Nouvelle carte de connexion d'un brancardier : { utilisateur_id, prenom, nom, code }.
+ *  Le code n'est donné qu'une fois (à imprimer en QR) ; l'ancienne carte ne fonctionne plus */
+export function genererCarte(id) {
+  return apiFetch(`/utilisateurs/${id}/carte`, { method: "POST" });
+}

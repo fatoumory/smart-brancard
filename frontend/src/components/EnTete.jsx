@@ -1,12 +1,15 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Activity, ChartColumn, ClipboardList, ClipboardPlus, LogOut, User } from "lucide-react";
+import { Activity, ChartColumn, ClipboardList, ClipboardPlus, LogOut, RadioTower, User } from "lucide-react";
 import { getRole, lireJeton, logoutApi } from "../services/authService";
 
 // Onglets de chaque rôle (maquette : "Dashboard" pour le régulateur, "Prescription" pour le médecin).
 // actif : pages où l'onglet est en surbrillance (le suivi d'une demande appartient à « Mes demandes »)
 const NAVIGATION = {
     regulateur: [
-        { chemin: "/regulateur", libelle: "Dashboard", icone: ChartColumn, actif: () => true },
+        { chemin: "/regulateur", libelle: "Dashboard", icone: ChartColumn, actif: (p) => p === "/regulateur" },
+        // Plan de l'hôpital où l'on déplace les agents : remplace les badges BLE dans le prototype
+        { chemin: "/regulateur/simulateur", libelle: "Simulateur", icone: RadioTower,
+            actif: (p) => p.startsWith("/regulateur/simulateur") },
     ],
     medecin: [
         { chemin: "/medecin", libelle: "Prescription", icone: ClipboardPlus, actif: (p) => p === "/medecin" },
