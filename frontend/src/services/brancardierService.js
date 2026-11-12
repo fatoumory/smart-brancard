@@ -8,7 +8,7 @@ export function getMonProfil() {
 }
 
 /** Change le statut du brancardier connecté : "DISPONIBLE", "EN_PAUSE" ou "INDISPONIBLE".
- *  Pour une pause, dureePauseMinutes (15 ou 45) : le serveur en déduit l'heure de fin (fin_pause)
+ *  Pour une pause, dureePauseMinutes (30 ou 45) : le serveur en déduit l'heure de fin (fin_pause)
  *  et remet lui-même l'agent disponible à la fin, même si l'application est fermée. */
 export function changerMonStatut(statut, dureePauseMinutes) {
     return apiFetch("/utilisateurs/me/statut", {

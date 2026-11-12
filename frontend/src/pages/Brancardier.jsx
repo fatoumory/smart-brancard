@@ -43,7 +43,7 @@ function Brancardier() {
     const lieux = useDonnees(listerNoeuds);
 
     // Change le statut sur le serveur, puis relit le profil pour afficher le nouvel état.
-    // dureePauseMinutes n'est envoyé que pour une pause (15 ou 45 min) : le serveur en déduit l'heure de fin. Renvoie true si le changement a réussi
+    // dureePauseMinutes n'est envoyé que pour une pause (30 ou 45 min) : le serveur en déduit l'heure de fin. Renvoie true si le changement a réussi
     async function changerStatut(nouveau, dureePauseMinutes) {
         setErreurStatut("");
         setEnvoi(true);

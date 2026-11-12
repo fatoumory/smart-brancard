@@ -17,12 +17,15 @@ function estEquipeDeJour() {
     return heure >= 6 && heure < 20;
 } 
 
+// Durées acceptées par le serveur : 30 ou 45 min (une autre durée est refusée).
+// Le serveur refuse aussi la pause s'il ne resterait plus assez d'agents disponibles :
+// son message (« ... trop peu d'agents disponibles ... ») s'affiche en haut de l'écran.
 function optionsPause() {
     return estEquipeDeJour()
         ? [{ libelle: "Pause déjeuner", minutes: 45, icone: UtensilsCrossed },
-            { libelle: "Pause courte", minutes: 15, icone: Coffee }]
+            { libelle: "Pause courte", minutes: 30, icone: Coffee }]
         : [{ libelle: "Pause dîner / nuit", minutes: 45, icone: Moon },
-            { libelle: "Pause courte", minutes: 15, icone: Coffee }];
+            { libelle: "Pause courte", minutes: 30, icone: Coffee }];
 }
 
 // Onglet « Mission » : la mission en cours si l'agent en a une, sinon ce que voit l'agent selon son statut.
