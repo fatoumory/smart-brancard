@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Bell, ChevronDown,CircleAlert, CircleCheck, Clock, Coffee, LogOut, Moon, Navigation, UtensilsCrossed } from "lucide-react";
 import MissionProposee from "./MissionProposee";
 import MissionEnCours from "./MissionEnCours";
+import { parler } from "../../services/voix";
 
 
 // À la fin d'une pause, le serveur remet l'agent disponible (sa tâche de fond passe toutes les 5 s) :
@@ -144,6 +145,8 @@ function EnPause({ finPause, onReprendre, onFin, onIndisponible, envoi }) {
     // puis on relit le profil. L'effet ne se relance que quand restantMs change : une seule fois à 0.
     useEffect(() => {
         if (restantMs !== 0) return undefined;
+        // Rappel vocal : l'agent peut ne pas regarder son téléphone pendant sa pause
+        parler("Votre pause est terminée. Vous allez de nouveau recevoir des missions.");
         const minuteur = setTimeout(onFin, DELAI_RELECTURE_MS);
         return () => clearTimeout(minuteur);
     }, [restantMs, onFin]);

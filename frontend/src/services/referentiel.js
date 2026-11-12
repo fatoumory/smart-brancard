@@ -2,7 +2,7 @@
 // Libellés et couleurs des valeurs communes au backend et au frontend.
 // Les clés sont exactement les énumérations du backend (backend/models/enums.py).
 
-import { Accessibility, Bed, Wind } from "lucide-react";
+import { Accessibility, Bandage, Bed, LogOut, Siren, Wind, Wrench } from "lucide-react";
 
 // Niveaux d'urgence, du plus au moins prioritaire, avec leur délai garanti (feuille de route, Sprint 5)
 export const URGENCES = {
@@ -28,14 +28,15 @@ export const STATUTS_MISSION = {
 
 // Motifs de refus d'une mission (énumération MotifRefus du backend).
 // consequence : ce que le serveur fait du brancardier après ce refus (services/assignation_service.py)
+// icone et couleur : le motif se reconnaît à son image, sans avoir à lire (il est aussi lu par la voix)
 export const MOTIFS_REFUS = {
-  MATERIEL_DEFECTUEUX: { libelle: "Matériel défectueux",
+  MATERIEL_DEFECTUEUX: { libelle: "Matériel défectueux", icone: Wrench, couleur: "text-amber-600",
     consequence: "Vous restez disponible : la régulation décide de la suite de la mission." },
-  INDISPONIBILITE_PHYSIQUE: { libelle: "Indisponibilité physique",
+  INDISPONIBILITE_PHYSIQUE: { libelle: "Indisponibilité physique", icone: Bandage, couleur: "text-red-600",
     consequence: "Vous passez indisponible." },
-  URGENCE_PRIORITAIRE: { libelle: "Urgence vitale prioritaire sur place",
+  URGENCE_PRIORITAIRE: { libelle: "Urgence vitale prioritaire sur place", icone: Siren, couleur: "text-red-700",
     consequence: "Vous passez en pause pendant 15 min." },
-  FIN_SERVICE: { libelle: "Fin de service imminente",
+  FIN_SERVICE: { libelle: "Fin de service imminente", icone: LogOut, couleur: "text-slate-600",
     consequence: "Vous passez indisponible." },
 };
 

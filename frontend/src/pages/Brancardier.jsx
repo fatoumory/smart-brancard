@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FileText, Navigation, User } from "lucide-react";
 import EcranMission from "../components/brancardier/EcranMission";
 import EcranJournal from "../components/brancardier/EcranJournal";
@@ -6,6 +6,8 @@ import EcranProfil from "../components/brancardier/EcranProfil";
 import { useDonnees } from "../hooks/useDonnees";
 import { MissionTerminee } from "../components/brancardier/MissionEnCours";
 import MaPosition from "../components/brancardier/MaPosition";
+import ActiverSon from "../components/brancardier/ActiverSon";
+import { annoncerMission } from "../services/voix";
 import { accepterMission, changerMonStatut, getMaMission, getMonProfil, refuserMission, scannerArrivee, scannerDepart } from "../services/brancardierService";
 import { STATUTS_AGENT } from "../services/referentiel";
 
@@ -35,6 +37,18 @@ function Brancardier() {
     const mission = useDonnees(getMaMission, INTERVALLE_MISSION_MS, ["missions"]);
     // Mission que l'agent vient de terminer (scan d'arrivée réussi) : confirmation affichée jusqu'à fermeture
     const [missionTerminee, setMissionTerminee] = useState(null);
+    // Dernière mission annoncée : chaque nouvelle proposition n'est annoncée qu'une fois
+    const derniereAnnoncee = useRef(null);
+
+    // Nouvelle mission proposée : sonnerie, vibration et annonce vocale (lieu, urgence, matériel),
+    // pour que l'agent n'ait pas à regarder son téléphone
+    const proposee = mission.donnees?.statut === "PROPOSE" ? mission.donnees : null;
+    useEffect(() => {
+        if (proposee && derniereAnnoncee.current !== proposee.id) {
+            derniereAnnoncee.current = proposee.id;
+            annoncerMission(proposee);
+        }
+    }, [proposee]);
 
     // Change le statut sur le serveur, puis relit le profil pour afficher le nouvel état.
     // dureePauseMinutes n'est envoyé que pour une pause (30 ou 45 min) : le serveur en déduit l'heure de fin. Renvoie true si le changement a réussi
@@ -119,6 +133,9 @@ function Brancardier() {
                     <p className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl">{erreur}</p>
                 )}
                 {!moi && profil.chargement && <p className="text-center text-slate-500 py-10">Chargement…</p>}
+
+                {/* Tant que l'agent n'a pas touché l'écran, le navigateur bloque la sonnerie et la voix */}
+                <ActiverSon />
 
                 {/* Position détectée par le badge (simulateur de badges dans le prototype) : l'agent ne la saisit plus */}
                 {moi && onglet === "mission" && <MaPosition />}
