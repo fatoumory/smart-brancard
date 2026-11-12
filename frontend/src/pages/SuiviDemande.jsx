@@ -106,6 +106,10 @@ function SuiviDemande() {
                     <RefreshCw className={`w-4 h-4 ${chargement ? "animate-spin" : ""}`} />
                     Actualiser l'état
                 </button>
+                <Link to="/medecin/demandes"
+                    className="w-full py-3 bg-white border border-slate-200 rounded-xl font-medium text-slate-700 hover:bg-slate-50 flex items-center justify-center gap-2">
+                    Toutes mes demandes
+                </Link>
                 <Link to="/medecin"
                     className="w-full py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-600 hover:bg-slate-100 flex items-center justify-center gap-2">
                     Nouvelle demande de transport

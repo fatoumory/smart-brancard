@@ -5,6 +5,7 @@ import Regulateur from './pages/Regulateur';
 import Brancardier from './pages/Brancardier';
 import Medecin from './pages/Medecin';
 import SuiviDemande from './pages/SuiviDemande';
+import MesDemandes from './pages/MesDemandes';
 import RouteProtegee from './routes/RouteProtegee';
 
 // L'état de connexion est lu depuis le localStorage (token JWT) :
@@ -18,6 +19,7 @@ function App() {
         <Route path="/regulateur" element={<RouteProtegee role="regulateur"><Regulateur /></RouteProtegee>} />
         <Route path="/brancardier" element={<RouteProtegee role="brancardier"><Brancardier /></RouteProtegee>} />
         <Route path="/medecin" element={<RouteProtegee role="medecin"><Medecin /></RouteProtegee>} />
+        <Route path="/medecin/demandes" element={<RouteProtegee role="medecin"><MesDemandes /></RouteProtegee>} />
         <Route path="/medecin/suivi/:id" element={<RouteProtegee role="medecin"><SuiviDemande /></RouteProtegee>} />
       </Routes>
     </BrowserRouter>

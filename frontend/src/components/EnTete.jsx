@@ -1,11 +1,18 @@
-import { NavLink, useNavigate } from "react-router-dom";
-import { Activity, ChartColumn, LogOut, Mic, User } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Activity, ChartColumn, ClipboardList, ClipboardPlus, LogOut, User } from "lucide-react";
 import { getRole, lireJeton, logoutApi } from "../services/authService";
 
-// Onglet principal de chaque rôle (maquette : "Dashboard" pour le régulateur, "Prescription" pour le médecin)
+// Onglets de chaque rôle (maquette : "Dashboard" pour le régulateur, "Prescription" pour le médecin).
+// actif : pages où l'onglet est en surbrillance (le suivi d'une demande appartient à « Mes demandes »)
 const NAVIGATION = {
-    regulateur: { chemin: "/regulateur", libelle: "Dashboard", icone: ChartColumn },
-    medecin: { chemin: "/medecin", libelle: "Prescription", icone: Mic },
+    regulateur: [
+        { chemin: "/regulateur", libelle: "Dashboard", icone: ChartColumn, actif: () => true },
+    ],
+    medecin: [
+        { chemin: "/medecin", libelle: "Prescription", icone: ClipboardPlus, actif: (p) => p === "/medecin" },
+        { chemin: "/medecin/demandes", libelle: "Mes demandes", icone: ClipboardList,
+            actif: (p) => p.startsWith("/medecin/demandes") || p.startsWith("/medecin/suivi") },
+    ],
 };
 
 // largeur : même largeur maximale que le contenu de la page, pour que le logo et l'utilisateur
@@ -14,7 +21,8 @@ function EnTete({ largeur = "max-w-7xl" }) {
     const navigate = useNavigate();
     const jeton = lireJeton();
     const role = getRole();
-    const onglet = NAVIGATION[role];
+    const onglets = NAVIGATION[role] ?? [];
+    const { pathname } = useLocation();
 
     function handleDeconnexion() {
         logoutApi();
@@ -32,17 +40,20 @@ function EnTete({ largeur = "max-w-7xl" }) {
                     <span className="font-bold text-slate-900 hidden sm:inline">Smart-Brancard</span>
                 </div>
 
-                {/* Onglet principal du rôle */}
-                {onglet && (
-                    <NavLink
-                        to={onglet.chemin}
-                        end={false}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primaire-clair text-primaire font-semibold text-sm"
-                    >
-                        <onglet.icone className="w-4 h-4" />
-                        {onglet.libelle}
-                    </NavLink>
-                )}
+                {/* Onglets du rôle ; sur un petit écran, l'icône seule quand il y en a plusieurs */}
+                <nav className="flex items-center gap-1">
+                    {onglets.map((o) => {
+                        const actif = o.actif(pathname);
+                        return (
+                            <Link key={o.chemin} to={o.chemin} title={o.libelle} aria-current={actif ? "page" : undefined}
+                                className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl font-semibold text-sm ${
+                                    actif ? "bg-primaire-clair text-primaire" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}>
+                                <o.icone className="w-4 h-4 shrink-0" />
+                                <span className={onglets.length > 1 ? "hidden sm:inline" : ""}>{o.libelle}</span>
+                            </Link>
+                        );
+                    })}
+                </nav>
 
                 {/* Utilisateur connecté et déconnexion */}
                 <div className="flex items-center gap-3">
