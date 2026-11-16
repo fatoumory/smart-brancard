@@ -22,7 +22,7 @@ const champClasse = "w-full px-4 py-3 bg-slate-50 border border-slate-200 rounde
 const listerServices = () => listerNoeuds("SERVICE");
 
 // Formulaire de demande de transport (maquette "Demande de transport patient").
-// L'assistant vocal de la maquette arrive au Sprint 4.
+// Patient introuvable : admission sur place dans le champ Patient (Sprint 4). La dictée vocale est en perspective.
 function Medecin() {
     const navigate = useNavigate();
     const noeuds = useDonnees(listerServices);
@@ -95,7 +95,7 @@ function Medecin() {
 
     return (
         <div className="min-h-screen">
-            <EnTete />
+            <EnTete largeur="max-w-3xl" />
             <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
                 <h1 className="text-2xl font-bold text-slate-900">Demande de transport patient</h1>
                 <p className="text-slate-500 mt-1">Remplissez le formulaire pour créer un ordre de brancardage.</p>

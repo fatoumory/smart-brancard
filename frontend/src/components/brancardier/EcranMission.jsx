@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Bell, ChevronDown,CircleAlert, CircleCheck, Clock, Coffee, LogOut, Moon, Navigation, UtensilsCrossed } from "lucide-react";
 import MissionProposee from "./MissionProposee";
 import MissionEnCours from "./MissionEnCours";
+import { parler } from "../../services/voix";
 
 
 // À la fin d'une pause, le serveur remet l'agent disponible (sa tâche de fond passe toutes les 5 s) :
@@ -17,16 +18,20 @@ function estEquipeDeJour() {
     return heure >= 6 && heure < 20;
 } 
 
+// Durées acceptées par le serveur : 30 ou 45 min (une autre durée est refusée).
+// Le serveur refuse aussi la pause s'il ne resterait plus assez d'agents disponibles :
+// son message (« ... trop peu d'agents disponibles ... ») s'affiche en haut de l'écran.
 function optionsPause() {
     return estEquipeDeJour()
         ? [{ libelle: "Pause déjeuner", minutes: 45, icone: UtensilsCrossed },
-            { libelle: "Pause courte", minutes: 15, icone: Coffee }]
+            { libelle: "Pause courte", minutes: 30, icone: Coffee }]
         : [{ libelle: "Pause dîner / nuit", minutes: 45, icone: Moon },
-            { libelle: "Pause courte", minutes: 15, icone: Coffee }];
+            { libelle: "Pause courte", minutes: 30, icone: Coffee }];
 }
 
 // Onglet « Mission » : la mission en cours si l'agent en a une, sinon ce que voit l'agent selon son statut.
-function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onAccepter, onRefuser, onScanDepart, onScanArrivee }) {
+function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onAccepter, onRefuser, onScanDepart, onScanArrivee,
+    onArrivee, onAppel }) {
     const [choixPause, setChoixPause] = useState(false);
 
     // La durée choisie est envoyée au serveur, qui calcule l'heure de fin (fin_pause)
@@ -58,7 +63,7 @@ function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onA
     // Mission acceptée (en route vers le patient) ou en transit : parcours et scans de la mission
     if (mission?.statut === "ACCEPTE" || mission?.statut === "EN_TRANSIT") {
         return <MissionEnCours key={mission.id} mission={mission}
-            onScanDepart={onScanDepart} onScanArrivee={onScanArrivee} />;
+            onScanDepart={onScanDepart} onScanArrivee={onScanArrivee} onArrivee={onArrivee} onAppel={onAppel} />;
     }
 
 
@@ -78,10 +83,13 @@ function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onA
         );
     }
 
+    // En mission sans mission en cours : l'arrivée vient d'être détectée par le badge, l'agent remet
+    // le patient au service. Le serveur le rend disponible dès que son badge est capté ailleurs
+    // (il a quitté la salle), ou au plus tard 10 min après l'arrivée.
     if (moi.statut === "EN_MISSION") {
         return (
-            <Etat icone={Navigation} couleur="text-primaire" fond="bg-primaire-clair" titre="Mission en cours"
-                texte="Les étapes de votre mission s'afficheront ici." />
+            <Etat icone={Navigation} couleur="text-primaire" fond="bg-primaire-clair" titre="Remise du patient"
+                texte="Vous redevenez disponible dès que vous quittez la salle (au plus tard 10 min après l'arrivée)." />
         );
     }
 
@@ -141,6 +149,8 @@ function EnPause({ finPause, onReprendre, onFin, onIndisponible, envoi }) {
     // puis on relit le profil. L'effet ne se relance que quand restantMs change : une seule fois à 0.
     useEffect(() => {
         if (restantMs !== 0) return undefined;
+        // Rappel vocal : l'agent peut ne pas regarder son téléphone pendant sa pause
+        parler("Votre pause est terminée. Vous allez de nouveau recevoir des missions.");
         const minuteur = setTimeout(onFin, DELAI_RELECTURE_MS);
         return () => clearTimeout(minuteur);
     }, [restantMs, onFin]);

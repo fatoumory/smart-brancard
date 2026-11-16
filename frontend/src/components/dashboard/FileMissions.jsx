@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { Activity, ArrowRight, Ban, ChevronDown, MoreHorizontal, Route, TriangleAlert, UserRoundCog, UserX, Zap } from "lucide-react";
+import { Activity, ArrowRight, Ban, ChevronDown, FlagTriangleRight, MoreHorizontal, Route, TriangleAlert, UserRoundCog, UserX, Zap } from "lucide-react";
 import { BadgeStatut, BadgeUrgence, Materiel } from "../Badges";
 import ActionRegulation from "./ActionRegulation";
 import { STATUTS_MISSION, URGENCES, formaterHeure, trierParPriorite } from "../../services/referentiel";
@@ -9,6 +9,20 @@ const selectClasse = "px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg t
 // Le régulateur peut réaffecter ou annuler tant que le patient n'est pas en transport
 // (même règle que le backend : services/regulation_service.py)
 const STATUTS_MODIFIABLES = ["EN_ATTENTE", "PROPOSE", "ACCEPTE"];
+
+// Actions du menu « ⋯ » selon le statut. En transit, seule la clôture de secours est possible :
+// l'arrivée n'a pas été détectée (badge muet, téléphone de l'agent éteint).
+function actionsPossibles(mission) {
+    if (mission.statut === "EN_TRANSIT") return ["cloturer"];
+    return STATUTS_MODIFIABLES.includes(mission.statut) ? ["reaffecter", "annuler"] : [];
+}
+
+// Bouton de chaque action dans le détail d'une mission
+const BOUTONS_ACTION = {
+    reaffecter: { libelle: "Réaffecter", icone: UserRoundCog, classe: "border-slate-200 text-slate-700 hover:bg-slate-100", iconeClasse: "text-primaire" },
+    annuler: { libelle: "Annuler la mission", icone: Ban, classe: "border-red-200 text-red-700 hover:bg-red-50", iconeClasse: "" },
+    cloturer: { libelle: "Clôturer (arrivée non détectée)", icone: FlagTriangleRight, classe: "border-emerald-200 text-emerald-700 hover:bg-emerald-50", iconeClasse: "" },
+};
 
 // Tableau des missions, trié par urgence puis ancienneté.
 // Un clic sur une ligne (ou sur « ⋯ ») affiche l'itinéraire et les actions du régulateur.
@@ -154,8 +168,8 @@ function FileMissions({ missions, typesNoeuds, agents, onAction }) {
                                     <td className="px-4 py-4 font-mono text-sm text-slate-600">{formaterHeure(m.date_creation)}</td>
                                     {/* Menu « ⋯ » : seulement si la mission peut encore être modifiée */}
                                     <td className="px-2 py-4">
-                                        {STATUTS_MODIFIABLES.includes(m.statut) && (
-                                            <button type="button" title="Réaffecter ou annuler" aria-label={`Actions sur la mission ${m.id}`}
+                                        {actionsPossibles(m).length > 0 && (
+                                            <button type="button" title={m.statut === "EN_TRANSIT" ? "Clôturer" : "Réaffecter ou annuler"} aria-label={`Actions sur la mission ${m.id}`}
                                                 onClick={(e) => {
                                                     // Sans stopPropagation, le clic refermerait aussi la ligne
                                                     e.stopPropagation();
@@ -175,19 +189,20 @@ function FileMissions({ missions, typesNoeuds, agents, onAction }) {
                                     <tr className="bg-slate-50 border-b border-slate-200">
                                         <td colSpan={10} className="px-4 py-4 space-y-3">
                                             {/* Actions du régulateur : d'abord le choix, puis le panneau de l'action */}
-                                            {STATUTS_MODIFIABLES.includes(m.statut) && (action ? (
+                                            {actionsPossibles(m).length > 0 && (action ? (
                                                 <ActionRegulation type={action} mission={m} agents={agents}
                                                     onFait={actionFaite} onFermer={() => setAction(null)} />
                                             ) : (
                                                 <div className="flex flex-wrap gap-2">
-                                                    <button type="button" onClick={() => setAction("reaffecter")}
-                                                        className="px-3 py-2 rounded-lg bg-white border border-slate-200 text-sm font-semibold text-slate-700 flex items-center gap-2 hover:bg-slate-100 cursor-pointer">
-                                                        <UserRoundCog className="w-4 h-4 text-primaire" /> Réaffecter
-                                                    </button>
-                                                    <button type="button" onClick={() => setAction("annuler")}
-                                                        className="px-3 py-2 rounded-lg bg-white border border-red-200 text-sm font-semibold text-red-700 flex items-center gap-2 hover:bg-red-50 cursor-pointer">
-                                                        <Ban className="w-4 h-4" /> Annuler la mission
-                                                    </button>
+                                                    {actionsPossibles(m).map((code) => {
+                                                        const b = BOUTONS_ACTION[code];
+                                                        return (
+                                                            <button key={code} type="button" onClick={() => setAction(code)}
+                                                                className={`px-3 py-2 rounded-lg bg-white border text-sm font-semibold flex items-center gap-2 cursor-pointer ${b.classe}`}>
+                                                                <b.icone className={`w-4 h-4 ${b.iconeClasse}`} /> {b.libelle}
+                                                            </button>
+                                                        );
+                                                    })}
                                                 </div>
                                             ))}
                                             <Itineraire mission={m} typesNoeuds={typesNoeuds} />

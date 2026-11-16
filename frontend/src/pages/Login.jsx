@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Activity, Smartphone, FileText, LogIn, AlertCircle, Loader2 } from "lucide-react";
-import { loginApi, logoutApi } from "../services/authService";
+import { Activity, Smartphone, FileText, LogIn, AlertCircle, Loader2, QrCode } from "lucide-react";
+import { loginApi, loginCarte, logoutApi } from "../services/authService";
+import { LecteurQR } from "../components/brancardier/ChampScan";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -9,6 +10,8 @@ function Login() {
   const [selectedRole, setSelectedRole] = useState("medecin");
   const [erreur, setErreur] = useState(""); // État pour afficher les erreurs
   const [chargement, setChargement] = useState(false); // État pour désactiver le bouton pendant la requête
+  // Caméra ouverte pour lire la carte de connexion du brancardier
+  const [scanCarte, setScanCarte] = useState(false);
   
   const navigate = useNavigate();
 
@@ -61,6 +64,22 @@ function Login() {
       navigate(`/${data.role}`, { replace: true });
     } catch (err) {
       // Tâche 3.3 : Affichage dynamique de l'erreur renvoyée par le service
+      setErreur(err.message);
+    } finally {
+      setChargement(false);
+    }
+  }
+
+  // Carte du brancardier lue par la caméra : connexion sans rien taper, pour toute la garde (8 h)
+  async function connexionParCarte(code) {
+    setScanCarte(false);
+    setErreur("");
+    setChargement(true);
+    try {
+      const data = await loginCarte(code);
+      // Les cartes ne sont données qu'aux brancardiers ; on vérifie tout de même le rôle renvoyé
+      navigate(`/${data.role}`, { replace: true });
+    } catch (err) {
       setErreur(err.message);
     } finally {
       setChargement(false);
@@ -120,6 +139,21 @@ function Login() {
               })} 
             </div>
           </div>
+
+          {/* Brancardier : sa carte (QR code collé au dos du badge) suffit, le formulaire reste en secours */}
+          {selectedRole === "brancardier" && (
+            <div className="space-y-3">
+              {scanCarte ? (
+                <LecteurQR onLu={connexionParCarte} onFermer={() => setScanCarte(false)} />
+              ) : (
+                <button type="button" onClick={() => { setErreur(""); setScanCarte(true); }} disabled={chargement}
+                  className="w-full py-4 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white font-bold rounded-xl flex items-center justify-center gap-3 cursor-pointer">
+                  <QrCode className="w-6 h-6" /> Scanner ma carte
+                </button>
+              )}
+              <p className="text-center text-xs text-slate-400">ou avec votre identifiant et votre mot de passe :</p>
+            </div>
+          )}
 
           {/* Saisie de l'email */}
           <div>

@@ -7,8 +7,8 @@ import { useDonnees } from "../hooks/useDonnees";
 import { getHistorique, getMission } from "../services/missionService";
 import { formaterHeure } from "../services/referentiel";
 
-// Le suivi est relu toutes les 10 s pour voir avancer la mission, en attendant les WebSockets (Sprint 4)
-const INTERVALLE_MS = 10000;
+// Le suivi avance en temps réel (WebSocket) ; relu aussi toutes les 30 s si la connexion est coupée
+const INTERVALLE_MS = 30000;
 
 // Les 4 étapes vues par le médecin (maquette "Suivi de la demande").
 // Chaque étape est atteinte avec un statut de mission ; son heure vient du journal d'audit.
@@ -34,7 +34,7 @@ function SuiviDemande() {
     const { id } = useParams();
     // Mission et journal d'audit sont chargés ensemble, pour rester cohérents
     const chargeur = useCallback(() => Promise.all([getMission(id), getHistorique(id)]), [id]);
-    const { donnees, erreur, chargement, recharger } = useDonnees(chargeur, INTERVALLE_MS);
+    const { donnees, erreur, chargement, recharger } = useDonnees(chargeur, INTERVALLE_MS, ["missions", "agents"]);
     const [mission, historique] = donnees ?? [];
 
     // Heure à laquelle la mission est passée pour la première fois dans un des statuts de l'étape
@@ -45,8 +45,8 @@ function SuiviDemande() {
 
     return (
         <div className="min-h-screen">
-            <EnTete />
-            <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-5">
+            <EnTete largeur="max-w-3xl" />
+            <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-5">
                 {erreur && <p className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl">{erreur}</p>}
 
                 {mission && (
@@ -106,6 +106,10 @@ function SuiviDemande() {
                     <RefreshCw className={`w-4 h-4 ${chargement ? "animate-spin" : ""}`} />
                     Actualiser l'état
                 </button>
+                <Link to="/medecin/demandes"
+                    className="w-full py-3 bg-white border border-slate-200 rounded-xl font-medium text-slate-700 hover:bg-slate-50 flex items-center justify-center gap-2">
+                    Toutes mes demandes
+                </Link>
                 <Link to="/medecin"
                     className="w-full py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-600 hover:bg-slate-100 flex items-center justify-center gap-2">
                     Nouvelle demande de transport

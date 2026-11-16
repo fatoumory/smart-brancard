@@ -22,7 +22,11 @@ export async function apiFetch(chemin, { json, headers, ...options } = {}) {
       body: json !== undefined ? JSON.stringify(json) : options.body,
     });
   } catch (error) {
-    throw new Error("Impossible de contacter le serveur. Le backend est-il démarré ?", { cause: error });
+    const erreur = new Error("Impossible de contacter le serveur. Le backend est-il démarré ?", { cause: error });
+    // Pas de réponse du tout (réseau coupé, serveur arrêté) : le mode hors ligne s'en sert
+    // pour mettre l'action en attente (voir services/horsLigne.js)
+    erreur.reseau = true;
+    throw erreur;
   }
 
   // Jeton expiré ou compte désactivé : retour à l'écran de connexion

@@ -7,7 +7,7 @@ import { formaterHeure } from "../../services/referentiel";
 // Onglet « Journal » : missions terminées par l'agent aujourd'hui (GET /missions/moi/journal),
 // de la plus récente à la plus ancienne. Rechargé à chaque ouverture de l'onglet.
 function EcranJournal() {
-    const journal = useDonnees(getMonJournal);
+    const journal = useDonnees(getMonJournal, undefined, ["missions"]);
     const missions = journal.donnees ?? [];
     // Délai garanti respecté : connu pour les missions prises en charge (dans_les_delais true / false)
     const aLHeure = missions.filter((m) => m.dans_les_delais === true).length;

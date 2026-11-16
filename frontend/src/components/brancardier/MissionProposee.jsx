@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { CircleCheck, CircleX, Flag, MapPin, Route, ShieldAlert, Timer, TriangleAlert, UserRound } from "lucide-react";
 import { BadgeUrgence, Materiel } from "../Badges";
 import { MOTIFS_REFUS } from "../../services/referentiel";
+import { parler } from "../../services/voix";
 
 // Sous ce nombre de secondes, le compte à rebours passe au rouge
 const SECONDES_ALERTE = 10;
@@ -122,12 +123,12 @@ function MissionProposee({ mission, envoi, onAccepter, onRefuser }) {
                 {/* Refuser n'envoie rien : il ouvre seulement le choix du motif */}
                 <button type="button" onClick={() => setRefusOuvert((o) => !o)} disabled={envoi || expiree}
                     aria-expanded={refusOuvert} aria-controls="motifs-refus"
-                    className="h-14 rounded-2xl bg-white border-2 border-red-200 text-red-700 font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60">
-                    <CircleX className="w-5 h-5" /> Refuser
+                    className="h-20 rounded-2xl bg-white border-2 border-red-300 text-red-700 text-lg font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60">
+                    <CircleX className="w-7 h-7" /> Refuser
                 </button>
                 <button type="button" onClick={onAccepter} disabled={envoi || expiree}
-                    className="h-14 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60">
-                    <CircleCheck className="w-5 h-5" /> Accepter
+                    className="h-20 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white text-lg font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60">
+                    <CircleCheck className="w-7 h-7" /> Accepter
                 </button>
             </div>
 
@@ -190,17 +191,25 @@ function MotifsRefus({ ouvert, motif, envoi, onChoisir, onConfirmer, onAnnuler }
                     <p className="px-1 font-semibold text-slate-900">Motif du refus</p>
                     <p className="px-1 text-sm text-slate-500">Obligatoire : il permet de réaffecter la mission rapidement.</p>
 
-                    {/* Un bouton par motif ; aria-pressed indique le motif sélectionné */}
-                    {Object.entries(MOTIFS_REFUS).map(([code, m]) => (
-                        <button key={code} type="button" onClick={() => onChoisir(code)} aria-pressed={motif === code}
-                            className={`w-full text-left p-4 rounded-xl border-2 cursor-pointer ${
-                                motif === code ? "border-red-400 bg-red-50" : "border-slate-200 hover:bg-slate-50"}`}>
-                            <span className="block font-semibold text-slate-900">{m.libelle}</span>
-                            <span className="flex items-start gap-1 text-xs text-slate-500 mt-1">
-                                <TriangleAlert className="w-3.5 h-3.5 shrink-0 mt-px" /> {m.consequence}
-                            </span>
-                        </button>
-                    ))}
+                    {/* Un grand carré par motif, reconnaissable à son image ; aria-pressed indique le motif choisi.
+                        Toucher un motif le lit à voix haute avec sa conséquence : l'agent n'a pas à lire. */}
+                    <div className="grid grid-cols-2 gap-2">
+                        {Object.entries(MOTIFS_REFUS).map(([code, m]) => (
+                            <button key={code} type="button" aria-pressed={motif === code}
+                                onClick={() => { onChoisir(code); parler(`${m.libelle}. ${m.consequence}`); }}
+                                className={`p-3 rounded-xl border-2 flex flex-col items-center text-center gap-2 cursor-pointer ${
+                                    motif === code ? "border-red-400 bg-red-50" : "border-slate-200 hover:bg-slate-50"}`}>
+                                <m.icone className={`w-10 h-10 ${m.couleur}`} />
+                                <span className="font-semibold text-sm text-slate-900 leading-tight">{m.libelle}</span>
+                            </button>
+                        ))}
+                    </div>
+                    {/* Conséquence du motif choisi, écrite en plus d'être lue */}
+                    {motif && (
+                        <p className="flex items-start gap-1 px-1 text-xs text-slate-500">
+                            <TriangleAlert className="w-3.5 h-3.5 shrink-0 mt-px" /> {MOTIFS_REFUS[motif].consequence}
+                        </p>
+                    )}
 
                     <div className="grid grid-cols-2 gap-3 pt-1">
                         <button type="button" onClick={onAnnuler}

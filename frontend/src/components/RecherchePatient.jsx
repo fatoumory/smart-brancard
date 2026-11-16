@@ -1,16 +1,25 @@
 import { useEffect, useState } from "react";
-import { Loader2, Search, UserRound, X } from "lucide-react";
+import { Loader2, PenLine, Search, UserPlus, UserRound, X } from "lucide-react";
+import FormulaireAdmission from "./FormulaireAdmission";
 import { rechercherPatients } from "../services/missionService";
 
 const DELAI_FRAPPE_MS = 300;
 
 // Recherche d'un patient déjà admis (nom, prénom ou IPP), puis sélection.
-// Le patient est créé à l'admission (POST /patients) : le médecin ne fait que le choisir.
+// Patient introuvable : le médecin l'admet sur place (FormulaireAdmission), puis il est choisi automatiquement.
+// Patient à l'identité provisoire : le médecin peut compléter son identité une fois connue.
 function RecherchePatient({ patient, onChoisir, champClasse }) {
     const [texte, setTexte] = useState("");
     // Résultats et texte de recherche qui les a produits (pour ignorer les réponses périmées)
     const [resultats, setResultats] = useState({ pour: "", liste: [], erreur: "" });
     const requete = texte.trim();
+    // Formulaire ouvert : "admission" (nouveau patient) ou "identite" (identité provisoire à compléter)
+    const [formulaire, setFormulaire] = useState(null);
+
+    function terminer(p) {
+        setFormulaire(null);
+        onChoisir(p);
+    }
 
     // Attend que la saisie se calme avant d'interroger le serveur
     useEffect(() => {
@@ -25,6 +34,13 @@ function RecherchePatient({ patient, onChoisir, champClasse }) {
         return () => { actif = false; clearTimeout(minuteur); };
     }, [requete]);
 
+    if (formulaire) {
+        return (
+            <FormulaireAdmission patient={formulaire === "identite" ? patient : null} texteRecherche={requete}
+                champClasse={champClasse} onTermine={terminer} onAnnuler={() => setFormulaire(null)} />
+        );
+    }
+
     if (patient) {
         return (
             <div className="flex items-center justify-between gap-3 px-4 py-3 bg-primaire-clair/60 border border-blue-200 rounded-xl">
@@ -32,15 +48,26 @@ function RecherchePatient({ patient, onChoisir, champClasse }) {
                     <UserRound className="w-5 h-5 text-primaire shrink-0" />
                     <div>
                         <p className="font-semibold text-slate-900">{patient.nom} {patient.prenom}</p>
-                        <p className="text-xs font-mono text-slate-500">IPP : {patient.id_hospitalisation}</p>
+                        <p className="text-xs font-mono text-slate-500">
+                            IPP : {patient.id_hospitalisation} · bracelet {patient.code_bracelet}
+                        </p>
                     </div>
                     <BadgeIdentite patient={patient} />
                 </div>
-                <button type="button" onClick={() => { onChoisir(null); setTexte(""); }}
-                    className="p-2 text-slate-500 hover:text-slate-900 hover:bg-white rounded-lg cursor-pointer"
-                    aria-label="Changer de patient" title="Changer de patient">
-                    <X className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                    {patient.statut_identite === "PROVISOIRE" && (
+                        <button type="button" onClick={() => setFormulaire("identite")}
+                            className="p-2 text-primaire hover:bg-white rounded-lg cursor-pointer"
+                            aria-label="Compléter l'identité" title="Compléter l'identité">
+                            <PenLine className="w-4 h-4" />
+                        </button>
+                    )}
+                    <button type="button" onClick={() => { onChoisir(null); setTexte(""); }}
+                        className="p-2 text-slate-500 hover:text-slate-900 hover:bg-white rounded-lg cursor-pointer"
+                        aria-label="Changer de patient" title="Changer de patient">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
             </div>
         );
     }
@@ -62,7 +89,7 @@ function RecherchePatient({ patient, onChoisir, champClasse }) {
                     {resultats.erreur && <p className="px-4 py-3 text-sm text-red-700">{resultats.erreur}</p>}
                     {!resultats.erreur && resultats.liste.length === 0 && (
                         <p className="px-4 py-3 text-sm text-slate-500">
-                            Aucun patient trouvé. Le patient doit d'abord être admis à l'accueil.
+                            Aucun patient trouvé.
                         </p>
                     )}
                     <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
@@ -84,6 +111,13 @@ function RecherchePatient({ patient, onChoisir, champClasse }) {
                     </ul>
                 </div>
             )}
+
+            {/* Patient pas encore admis (ou homonyme absent de la liste) : admission sur place */}
+            <button type="button" onClick={() => setFormulaire("admission")}
+                className="mt-2 text-sm font-medium text-primaire hover:underline flex items-center gap-1.5 cursor-pointer">
+                <UserPlus className="w-4 h-4" />
+                Patient introuvable ? L'admettre
+            </button>
         </div>
     );
 }
