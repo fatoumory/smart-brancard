@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { BadgeCheck, CreditCard, Printer, UserRoundCheck, UserRoundX, Users, X } from "lucide-react";
+import { BadgeCheck, CreditCard, Printer, Search, UserRoundCheck, UserRoundX, Users, X } from "lucide-react";
 import EnTete from "../components/EnTete";
 import { useDonnees } from "../hooks/useDonnees";
 import { lireJeton } from "../services/authService";
@@ -8,6 +8,19 @@ import { changerActivation, genererCarte, listerUtilisateurs } from "../services
 
 const ROLES = { BRANCARDIER: "Brancardier", MEDECIN: "Médecin", REGULATEUR: "Régulateur", ADMIN: "Administrateur" };
 const ORDRE_ROLES = ["BRANCARDIER", "MEDECIN", "REGULATEUR", "ADMIN"];
+
+// Texte comparable pour la recherche : minuscules, sans accents (« Séne » est trouvé en tapant « sene »)
+function normaliser(texte) {
+    return (texte ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+}
+
+// Le compte correspond-il à la recherche ? Chaque mot tapé doit se trouver dans le prénom ou le nom
+// (« awa diallo », « diallo awa » et « dial » trouvent tous Awa Diallo)
+function correspond(utilisateur, recherche) {
+    const mots = normaliser(recherche).split(/\s+/).filter(Boolean);
+    const identite = normaliser(`${utilisateur.prenom} ${utilisateur.nom}`);
+    return mots.every((mot) => identite.includes(mot));
+}
 
 // Comptes du personnel (régulateur) :
 //   - carte de connexion des brancardiers : un QR code à imprimer et à coller au dos du badge ;
@@ -24,9 +37,12 @@ function Comptes() {
     const [erreur, setErreur] = useState("");
     // Le régulateur ne peut pas désactiver son propre compte (le serveur le refuse aussi)
     const moi = Number(lireJeton()?.sub);
+    // Recherche par nom ou prénom, faite dans le navigateur (la liste du personnel est déjà chargée)
+    const [recherche, setRecherche] = useState("");
 
-    const liste = [...(utilisateurs.donnees ?? [])].sort((a, b) =>
+    const tous = [...(utilisateurs.donnees ?? [])].sort((a, b) =>
         ORDRE_ROLES.indexOf(a.role) - ORDRE_ROLES.indexOf(b.role) || a.nom.localeCompare(b.nom));
+    const liste = tous.filter((u) => correspond(u, recherche));
 
     // Appel au serveur, puis relecture de la liste ; le message d'erreur du serveur est affiché
     async function agir(action) {
@@ -72,9 +88,23 @@ function Comptes() {
                 {carte && <CarteConnexion carte={carte} onFermer={() => setCarte(null)} />}
 
                 <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <h2 className="flex items-center gap-2 p-5 border-b border-slate-100 text-xl font-bold text-slate-900">
-                        <Users className="w-5 h-5 text-primaire" /> Comptes
-                    </h2>
+                    <div className="flex flex-wrap items-center justify-between gap-3 p-5 border-b border-slate-100">
+                        <h2 className="flex items-center gap-2 text-xl font-bold text-slate-900">
+                            <Users className="w-5 h-5 text-primaire" /> Comptes
+                            {/* Nombre de comptes affichés, sur le total, quand une recherche est en cours */}
+                            {recherche.trim() && (
+                                <span className="text-sm font-medium text-slate-500">{liste.length} sur {tous.length}</span>
+                            )}
+                        </h2>
+                        {/* Barre de recherche : filtre la liste à chaque lettre tapée */}
+                        <label className="relative w-full sm:w-80">
+                            <span className="sr-only">Rechercher par nom ou prénom</span>
+                            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <input type="search" value={recherche} onChange={(e) => setRecherche(e.target.value)}
+                                placeholder="Rechercher par nom ou prénom…" autoComplete="off"
+                                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:border-primaire focus:bg-white focus:ring-2 focus:ring-primaire-clair" />
+                        </label>
+                    </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left min-w-[720px]">
                             <thead className="bg-slate-50 border-b border-slate-200">
@@ -87,6 +117,14 @@ function Comptes() {
                                 </tr>
                             </thead>
                             <tbody>
+                                {/* Aucun compte ne correspond à la recherche */}
+                                {liste.length === 0 && tous.length > 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
+                                            Aucun compte ne correspond à « {recherche.trim()} ».
+                                        </td>
+                                    </tr>
+                                )}
                                 {liste.map((u) => (
                                     <tr key={u.id} className={`border-b border-slate-100 ${u.est_actif ? "" : "bg-slate-50 text-slate-400"}`}>
                                         <td className="px-4 py-3">
