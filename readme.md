@@ -10,7 +10,7 @@ Un médecin ou un infirmier demande le transport d'un patient. L'application cal
 |---|---|---|
 | Backend | Python, FastAPI | API REST, logique métier, Dijkstra |
 | Base de données | PostgreSQL + PostGIS (Docker) | Comptes, patients, missions, graphe de l'hôpital, historique |
-| Temps réel | Redis (Docker) | Statuts des agents, file d'attente (Sprint 4) |
+| Temps réel | WebSocket `/ws`, Redis Pub/Sub (Docker) | Les écrans sont prévenus dès qu'une donnée change |
 | Frontend | React, Vite (PWA) | Dashboard du régulateur, interface Médecin, application du brancardier |
 
 ## Lancer le projet
@@ -56,7 +56,9 @@ Si le backend ne tourne pas sur http://localhost:8000, copier `frontend\.env.exa
 
 **5. Comptes et données de test**
 
-Le régulateur crée les autres comptes depuis http://localhost:8000/docs (`POST /auth/register`, rôle `MEDECIN` ou `BRANCARDIER`). Il n'y a pas encore d'écran d'admission : pour tester l'interface Médecin, admettre d'abord un patient avec `POST /patients`, connecté en médecin.
+Le régulateur crée les autres comptes depuis http://localhost:8000/docs (`POST /auth/register`, rôle `MEDECIN` ou `BRANCARDIER`). Il imprime ensuite la carte de connexion des brancardiers depuis l'écran **Comptes**. Le médecin admet un patient introuvable directement depuis la demande de transport.
+
+Pour une démonstration, ouvrir l'écran **Simulateur** du régulateur : il remplace les badges BLE et fait se déplacer les agents de salle en salle.
 
 **Après chaque `git pull`** : relancer `pip install -r requirements.txt` et `alembic upgrade head` dans `backend/`.
 
@@ -64,9 +66,9 @@ Le régulateur crée les autres comptes depuis http://localhost:8000/docs (`POST
 
 | Rôle | Ce qu'il peut faire |
 |---|---|
-| `REGULATEUR` | Créer les comptes, superviser toutes les missions, bloquer un ascenseur ou un couloir |
+| `REGULATEUR` | Créer, désactiver les comptes et générer les cartes de connexion, superviser toutes les missions, réaffecter, annuler ou clôturer une mission, traiter les alertes, bloquer un ascenseur ou un couloir, faire tourner le simulateur de badges |
 | `MEDECIN` | Prescripteur (médecin ou infirmier) : admettre un patient, créer une mission, suivre ses propres demandes |
-| `BRANCARDIER` | Changer son statut (disponible, pause…). La réception et la réalisation des missions arrivent au Sprint 3 |
+| `BRANCARDIER` | Recevoir, accepter ou refuser les missions, scanner le bracelet (et les tags de salle en secours), appeler le régulateur, changer son statut (disponible, pause de 30 ou 45 min, indisponible) |
 
 ## Le graphe de l'hôpital
 
@@ -88,7 +90,11 @@ Dijkstra (NetworkX) calcule le plus court chemin. Une arête **bloquée** par le
 | Route | Rôle | Usage |
 |---|---|---|
 | `POST /auth/login` | tous | Connexion, renvoie un jeton JWT valable 8 h |
+| `POST /auth/carte` | brancardier | Connexion en scannant sa carte QR (même jeton de 8 h) |
 | `POST /auth/register` | régulateur | Créer un compte |
+| `PATCH /utilisateurs/{id}` | régulateur | Désactiver ou réactiver un compte (jamais de suppression) |
+| `POST /utilisateurs/{id}/carte` | régulateur | Générer la carte de connexion d'un brancardier (l'ancienne ne fonctionne plus) |
+| `PATCH /utilisateurs/me/statut` | brancardier | Disponible, pause de 30 ou 45 min, indisponible |
 | `POST /patients` | prescripteur | Admettre un patient (IPP et bracelet `QR-<IPP>` générés, identité provisoire possible) |
 | `GET /patients?recherche=` | prescripteur | Rechercher un patient par nom, prénom ou IPP |
 | `PATCH /patients/{id}` | prescripteur | Valider ou corriger une identité (l'IPP ne change jamais) |
@@ -98,6 +104,16 @@ Dijkstra (NetworkX) calcule le plus court chemin. Une arête **bloquée** par le
 | `GET /missions` | régulateur, prescripteur | Missions triées par urgence. Un prescripteur ne voit que les siennes |
 | `GET /missions/{id}` | régulateur, prescripteur | Détail d'une mission |
 | `GET /missions/{id}/historique` | régulateur, prescripteur | Journal d'audit de la mission |
+| `GET /missions/moi` · `GET /missions/moi/journal` | brancardier | Sa mission en cours ; ses missions terminées du jour |
+| `PUT /missions/{id}/accept` · `PUT /missions/{id}/refuse` | brancardier | Répondre à une mission proposée (refus avec motif) |
+| `POST /missions/{id}/scan-depart` | brancardier | Prise en charge : bracelet, plus le tag de la salle si le badge n'a pas été détecté |
+| `POST /missions/{id}/scan-arrivee` · `POST /missions/{id}/arrivee` | brancardier | Clôture de secours : par le tag de la salle, ou bouton « Arrivé » |
+| `POST /missions/{id}/appel-regulateur` | brancardier | Appeler le régulateur (bracelet illisible, scans refusés) |
+| `PUT /missions/{id}/reaffecter` · `annuler` · `cloturer` | régulateur | Réaffecter ou annuler avant le transport ; clôturer une mission restée en transit |
+| `GET /alertes` · `PUT /alertes/{id}/traiter` | régulateur | Alertes en cours (appels des agents), et leur traitement |
+| `POST /detections/badge` | régulateur | Simulateur de badges : le badge d'un agent est capté dans une salle |
+| `GET /missions/saturation` | régulateur | Saturation de la flotte : missions en attente, en retard, agents disponibles, ordre de la file |
+| `WS /ws` | tous | Temps réel : après connexion (1er message `{"jeton": ...}`), reçoit `{"type": "maj", "sujets": [...]}` à chaque changement |
 
 La liste complète, avec les formats et les codes d'erreur, se trouve dans http://localhost:8000/docs.
 
@@ -120,11 +136,13 @@ Après la connexion, chaque rôle arrive sur son propre écran. Un utilisateur q
 
 | Écran | Adresse | Contenu |
 |---|---|---|
-| Connexion | `/login` | Choix du profil, puis identifiant et mot de passe. Le compte doit correspondre au profil choisi |
-| Dashboard du régulateur | `/regulateur` | 4 indicateurs, file des missions triée par urgence avec filtres, itinéraire étape par étape (clic sur une ligne), agents et leur statut, activité de la journée. Rafraîchi toutes les 15 s |
-| Demande de transport | `/medecin` | Recherche du patient admis (nom, prénom ou IPP), urgence et délai garanti, départ et arrivée choisis parmi les services, matériel, consigne |
-| Suivi de la demande | `/medecin/suivi/{id}` | Les 4 étapes de la mission, avec l'heure de chacune lue dans le journal d'audit |
-| Brancardier | `/brancardier` | Page provisoire : l'application mobile arrive au Sprint 3 |
+| Connexion | `/login` | Choix du profil, puis identifiant et mot de passe. Le brancardier peut aussi scanner sa carte (« Scanner ma carte ») |
+| Dashboard du régulateur | `/regulateur` | Bandeau « Saturation flotte », appels des agents, 5 indicateurs, file des missions (réaffecter, annuler, clôturer), agents et leur position, activité de la journée, blocage des ascenseurs et couloirs. Mis à jour en temps réel |
+| Simulateur de badges | `/regulateur/simulateur` | Plan de l'hôpital : on pose chaque agent dans une salle, son badge y est capté toutes les 5 s |
+| Comptes | `/regulateur/comptes` | Impression des cartes de connexion, désactivation et réactivation des comptes |
+| Demande de transport | `/medecin` | Recherche du patient (ou admission s'il est introuvable), urgence et délai garanti, départ et arrivée, matériel, consigne |
+| Mes demandes · Suivi | `/medecin/demandes` · `/medecin/suivi/{id}` | Les demandes du médecin, puis les étapes de chacune avec l'agent, sa position et l'arrivée estimée |
+| Brancardier | `/brancardier` | Application mobile : annonce vocale des missions, accepter ou refuser (motifs en images), caméra ouverte seule au départ, bracelet seul, arrivée détectée, bouton « Arrivé », appel au régulateur, pauses, mode hors ligne |
 
 Délais garantis selon l'urgence : **URGENT 3 min**, **HAUTE 8 min**, **MOYENNE 15 min**, **BASSE 30 min**.
 
@@ -164,7 +182,7 @@ frontend/src/
 ├── pages/        Un fichier par écran (Login, Regulateur, Medecin, SuiviDemande, Brancardier)
 ├── components/   Éléments réutilisables : en-tête, badges, recherche de patient, cartes du dashboard
 ├── services/     Appels à l'API (api.js ajoute le jeton JWT), connexion, libellés des urgences et statuts
-├── hooks/        useDonnees : chargement des données et rafraîchissement automatique
+├── hooks/        useDonnees : chargement des données, rechargées par le temps réel (WebSocket)
 └── routes/       RouteProtegee : accès à un écran selon le rôle
 ```
 
@@ -191,9 +209,14 @@ npm run build
 - **Journal d'audit immuable** : chaque changement de statut d'une mission ajoute une ligne horodatée. Un déclencheur PostgreSQL interdit de les modifier ou de les supprimer (CDC §7.3).
 - **Aucune donnée clinique** n'est stockée, seulement l'identité et la logistique du transport (CDC §7.2).
 - **Session de 8 h côté frontend** : le jeton JWT est gardé dans le navigateur. Un jeton expiré, ou une réponse 401 de l'API, renvoie à l'écran de connexion. La déconnexion efface le jeton et le rôle.
-- **Balises BLE simulées** : dans l'application du brancardier, le lieu choisi dans « Je suis à » est envoyé (`POST /detections`) aussitôt, puis toutes les 2 min tant que l'application est ouverte, comme une vraie balise. Les scans de départ et d'arrivée enregistrent la salle scannée, mais ni cette position ni celle reprise à l'ouverture ne sont renvoyées : si l'agent se déplace sans choisir son lieu, sa position est ignorée au bout de 10 min (il passe après les agents localisés, sans être exclu), et son arrivée estimée n'est pas calculée.
-
-- **Rafraîchissement périodique** : le dashboard se met à jour toutes les 15 s, le suivi du médecin toutes les 10 s, et la mission du brancardier toutes les 5 s (une proposition n'attend que 30 à 60 s). Les WebSockets du Sprint 4 remplaceront ces mécanismes.
+- **Badges BLE (Sprint 4)** : un récepteur de salle signale le badge d'un agent (`POST /detections/badge`) ; dans le prototype, c'est le simulateur de badges. Chaque détection garde son origine (badge, scan ou déclaration) : seuls le badge et le scan prouvent la présence. Avec le badge, le bracelet suffit au départ ; 30 s de présence dans la salle d'arrivée terminent la mission (méthode `BALISE`) ; l'agent redevient disponible à sa sortie, ou 10 min après. Le tag de la salle, le bouton « Arrivé » et la clôture par le régulateur restent en secours.
+- **Pauses** : 30 min, ou 45 min pour le repas, refusées si elles laisseraient moins de `MIN_AGENTS_DISPONIBLES` agents disponibles (`.env`, 1 par défaut). Le serveur remet l'agent disponible à la fin.
+- **Carte de connexion** : le régulateur génère pour chaque brancardier un code imprimé en QR, donné une seule fois ; seule son empreinte SHA-256 est gardée. Une nouvelle carte rend l'ancienne inutilisable ; le mot de passe reste valable.
+- **Actions hors ligne** : le téléphone peut renvoyer une action avec son heure réelle (`horodatage_client`), refusée si elle est dans le futur, avant la mission ou vieille de plus de 30 min ; le journal garde les deux heures. Une action déjà enregistrée et renvoyée n'est pas comptée deux fois.
+- **File d'attente avec vieillissement** : l'URGENT passe toujours en premier ; les autres missions sont servies par échéance (création + délai garanti). Une mission BASSE qui attend depuis longtemps passe donc devant une MOYENNE qui vient d'arriver. La flotte est « saturée » quand au moins `SEUIL_SATURATION` missions (`.env`, 3 par défaut) attendent et qu'il y en a plus que d'agents disponibles.
+- **Temps réel** : à chaque validation en base, le serveur repère les tables modifiées et envoie seulement le sujet (`missions`, `agents`, `alertes`, `graphe`) aux écrans connectés au WebSocket `/ws`. L'écran recharge alors ses données par les routes habituelles, qui vérifient les droits : aucune donnée patient ne passe par le WebSocket. Avec `REDIS_URL`, les sujets passent par Redis Pub/Sub, pour plusieurs processus du serveur. Les écrans se rechargent aussi toutes les 30 s, en secours.
+- **Annonces vocales** : sonnerie (Web Audio), vibration (Android) et voix française du navigateur. Le navigateur bloque le son avant un premier toucher : le bouton « Activer le son » le débloque à l'ouverture.
+- **Hors ligne côté téléphone** : seule la mission en cours est gardée, et elle est effacée à la déconnexion. Les actions faites sans réseau attendent, puis partent dans l'ordre, avec leur heure réelle, au retour du réseau.
 
 ## Avancement
 
@@ -202,5 +225,5 @@ npm run build
 - [x] Sprint 2 (backend) : graphe, Dijkstra, missions, admission des patients, historique, routes de lecture
 - [x] Sprint 2 (frontend) : application installable (PWA), dashboard du régulateur, demande de transport et suivi du médecin
 - [x] Sprint 3 : attribution automatique, application mobile du brancardier, scans NFC et QR
-- [ ] Sprint 4 : dictée vocale (Whisper), temps réel (WebSockets, Redis)
+- [x] Sprint 4 : parcours à gestes réduits (badges simulés, bracelet seul, arrivée détectée, annonce vocale), pauses, appels au régulateur, carte de connexion, hors ligne, comptes, temps réel (WebSocket, Redis), saturation de la flotte. La dictée vocale (Whisper) passe en perspective
 - [ ] Sprint 5 : tests de charge (Locust), données MIMIC-III, lancement en une commande

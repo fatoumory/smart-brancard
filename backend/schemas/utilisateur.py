@@ -3,6 +3,7 @@
 # contrôlent ce qui est renvoyé au frontend (jamais le hash du mot de passe)
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -42,6 +43,8 @@ class UtilisateurOut(BaseModel):
     nom: str
     role: Role
     est_actif: bool
+    # Une carte de connexion (QR) a été générée ; le code lui-même n'est jamais renvoyé ici
+    a_une_carte: bool = False
     # Renseignés uniquement pour un brancardier
     statut: StatutAgent | None = None
     compteur_mission: int | None = None
@@ -58,12 +61,32 @@ class UtilisateurOut(BaseModel):
 class StatutUpdate(BaseModel):
     """Changement de statut opérationnel d'un brancardier"""
     statut: StatutAgent
-    # Durée de la pause en minutes (seulement pour EN_PAUSE ; 15 min si non précisée)
-    duree_pause_minutes: int | None = Field(default=None, ge=1, le=60)
+    # Durée de la pause en minutes (seulement pour EN_PAUSE) : 30, ou 45 pour le repas ;
+    # 30 min si non précisée
+    duree_pause_minutes: Literal[30, 45] | None = None
 
 
 class Token(BaseModel):
-    """Réponse de POST /auth/login"""
+    """Réponse de POST /auth/login et POST /auth/carte"""
     access_token: str
     token_type: str = "bearer"
     role: Role
+
+
+class ActivationCompte(BaseModel):
+    """Corps de PATCH /utilisateurs/{id} : désactiver (false) ou réactiver (true) un compte"""
+    est_actif: bool
+
+
+class CarteConnexion(BaseModel):
+    """Corps de POST /auth/carte : le code lu dans le QR de la carte"""
+    code: str = Field(min_length=1, max_length=200)
+
+
+class CarteOut(BaseModel):
+    """Réponse de POST /utilisateurs/{id}/carte : le code à imprimer en QR.
+    Il n'est donné qu'une fois : le serveur n'en garde que l'empreinte."""
+    utilisateur_id: int
+    prenom: str
+    nom: str
+    code: str

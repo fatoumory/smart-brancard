@@ -29,6 +29,11 @@ class Historique(Base):
     horodatage = Column(DateTime(timezone=True), nullable=False,
                         default=lambda: datetime.now(timezone.utc))
 
+    # Action faite hors ligne (ascenseur, sous-sol) et envoyée au retour du réseau : heure réelle
+    # donnée par le téléphone. L'heure de réception (horodatage) est gardée à côté : les deux
+    # restent visibles, et une heure incohérente est refusée (voir verifier_horodatage_client)
+    horodatage_client = Column(DateTime(timezone=True), nullable=True)
+
     # Comment le changement a été validé (saisie, scan QR, badge NFC, voix, forçage en urgence)
     methode_verification = Column(Enum(MethodeVerification, name="methode_verification"),
                                   nullable=False, default=MethodeVerification.MANUEL)

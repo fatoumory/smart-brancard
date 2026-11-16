@@ -59,6 +59,24 @@ class MethodeVerification(str, Enum):
     BADGE_NFC = "BADGE_NFC"
     COMMANDE_VOCALE = "COMMANDE_VOCALE"
     FORCE_URGENCE = "FORCE_URGENCE"
+    # Arrivée prouvée par la présence du badge dans la salle de destination (30 s au moins)
+    BALISE = "BALISE"
+
+
+class OrigineDetection(str, Enum):
+    # BADGE : capté par le récepteur d'une salle (simulateur ou ESP32) ; prouve la présence
+    # SCAN : enregistré par le serveur lors d'un scan de tag ; prouve la présence
+    # DECLARATION : l'agent a indiqué lui-même où il est (« Je suis à ») ; ne prouve rien
+    BADGE = "BADGE"
+    SCAN = "SCAN"
+    DECLARATION = "DECLARATION"
+
+
+class RaisonAppel(str, Enum):
+    # Pourquoi un agent appelle le régulateur pendant une mission
+    ECHECS_SCAN = "ECHECS_SCAN"                  # plusieurs scans du bracelet refusés
+    BRACELET_ILLISIBLE = "BRACELET_ILLISIBLE"    # bracelet abîmé, absent ou illisible
+    AUTRE = "AUTRE"
 
 
 class MotifRefus(str, Enum):

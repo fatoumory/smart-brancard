@@ -9,8 +9,9 @@ from models.mission import Mission
 from models.historique import Historique
 from models.detection import Detection
 from models.journal_assistance import JournalAssistance
+from models.alerte import Alerte
 
 __all__ = [
     "Utilisateur", "Brancardier", "Patient", "NoeudHopital", "Arete",
-    "Mission", "Historique", "Detection", "JournalAssistance",
+    "Mission", "Historique", "Detection", "JournalAssistance", "Alerte",
 ]

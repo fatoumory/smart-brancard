@@ -12,16 +12,19 @@ from models.mission import Mission
 from models.noeud_hopital import NoeudHopital
 from models.patient import Patient
 from models.utilisateur import Brancardier, Utilisateur
-from schemas.mission import (HistoriqueOut, MissionCreate, MissionOut, Reaffectation, RefusMission,
-                             ScanArrivee, ScanDepart)
+from schemas.alerte import AlerteOut, AppelRegulateur
+from schemas.mission import (ActionHorsLigne, HistoriqueOut, MissionCreate, MissionOut, Reaffectation,
+                             RefusMission, SaturationOut, ScanArrivee, ScanDepart)
+from services.alerte_service import MissionPasEnCours, MissionSansAgent, appeler_regulateur, vers_alertes_out
 from services.auth_service import require_role
 from services.graphe_service import ItineraireIntrouvable, calculer_itineraire
 from services.assignation_service import (MissionNonProposee, ReponseImpossible, accepter_mission,
                                          refuser_mission, traiter_file_attente)
-from services.historique_service import changer_statut, historique_de
+from services.historique_service import HorodatageInvalide, changer_statut, historique_de
 from services.regulation_service import (ActionImpossible, MissionIntrouvable, annuler_mission,
-                                        reaffecter_manuellement)
-from services.scan_service import ScanInvalide, scanner_arrivee, scanner_depart
+                                        cloturer_mission, reaffecter_manuellement)
+from services.saturation_service import etat_de_la_flotte
+from services.scan_service import ScanInvalide, declarer_arrivee, scanner_arrivee, scanner_depart
 from services.vue_mission_service import construire_missions_out
 
 # Préfixe commun à toutes les routes de ce fichier: /missions/...
@@ -143,6 +146,7 @@ def lire_historique(
         brancardier_id=l.brancardier_id,
         methode_verification=l.methode_verification,
         motif_refus=l.motif_refus,
+        horodatage_client=l.horodatage_client,
     ) for l in lignes]
 
 
@@ -216,6 +220,16 @@ def lister_missions(
     return construire_missions_out(db, missions)
 
 
+
+#  Saturation de la flotte (bandeau « Saturation flotte » du dashboard, CDC §5.4)
+# Déclarée avant /{mission_id} : sinon « saturation » serait lu comme un numéro de mission
+@router.get("/saturation", response_model=SaturationOut)
+def saturation(
+    db: Session = Depends(get_db),
+    _: Utilisateur = Depends(require_role([Role.REGULATEUR]))
+):
+    return etat_de_la_flotte(db)
+
 #  Détail d'une mission (suivi de la demande)
 @router.get("/{mission_id}", response_model=MissionOut)
 def lire_mission(
@@ -237,18 +251,29 @@ def erreur_reponse(e: Exception) -> HTTPException:
                          detail="Cette mission n'attend plus de réponse")
 
 
+def erreur_horodatage(e: HorodatageInvalide) -> HTTPException:
+    """Heure d'une action hors ligne incohérente (future, trop ancienne, avant la mission)"""
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e))
+
+
 # Acceptation : la mission passe ACCEPTE, l'agent rejoint le patient
+# Corps facultatif : {"horodatage_client": "..."} pour une acceptation faite hors ligne
 @router.put("/{mission_id}/accept", response_model=MissionOut)
 def accepter(
     mission_id: int,
+    donnees: ActionHorsLigne | None = None,
     db: Session = Depends(get_db),
     current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
 ):
     try:
-        mission = accepter_mission(db, mission_id, current_user)
+        mission = accepter_mission(db, mission_id, current_user,
+                                   donnees.horodatage_client if donnees else None)
     except (MissionNonProposee, ReponseImpossible) as e:
         db.rollback()
         raise erreur_reponse(e) from None
+    except HorodatageInvalide as e:
+        db.rollback()
+        raise erreur_horodatage(e) from None
     return vers_mission_out(db, mission)
 
 
@@ -261,10 +286,13 @@ def refuser(
     current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
 ):
     try:
-        mission = refuser_mission(db, mission_id, current_user, donnees.motif)
+        mission = refuser_mission(db, mission_id, current_user, donnees.motif, donnees.horodatage_client)
     except (MissionNonProposee, ReponseImpossible) as e:
         db.rollback()
         raise erreur_reponse(e) from None
+    except HorodatageInvalide as e:
+        db.rollback()
+        raise erreur_horodatage(e) from None
     return vers_mission_out(db, mission)
 
 
@@ -291,10 +319,13 @@ def scan_depart(
 ):
     try:
         mission = scanner_depart(db, mission_id, current_user, donnees.tag_nfc,
-                                 donnees.code_bracelet, donnees.forcer_urgence)
+                                 donnees.code_bracelet, donnees.forcer_urgence, donnees.horodatage_client)
     except (MissionNonProposee, ReponseImpossible, ScanInvalide) as e:
         db.rollback()
         raise erreur_scan(e, "prise en charge") from None
+    except HorodatageInvalide as e:
+        db.rollback()
+        raise erreur_horodatage(e) from None
     return vers_mission_out(db, mission)
 
 
@@ -307,10 +338,53 @@ def scan_arrivee(
     current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
 ):
     try:
-        mission = scanner_arrivee(db, mission_id, current_user, donnees.tag_nfc)
+        mission = scanner_arrivee(db, mission_id, current_user, donnees.tag_nfc, donnees.horodatage_client)
     except (MissionNonProposee, ReponseImpossible, ScanInvalide) as e:
         db.rollback()
         raise erreur_scan(e, "arrivée") from None
+    except HorodatageInvalide as e:
+        db.rollback()
+        raise erreur_horodatage(e) from None
+    return vers_mission_out(db, mission)
+
+
+# Appel du régulateur par l'agent bloqué : bracelet illisible, plusieurs scans refusés...
+# Exemple : {"raison": "BRACELET_ILLISIBLE"}. Un second appel pour la même mission ne crée pas de doublon.
+@router.post("/{mission_id}/appel-regulateur", response_model=AlerteOut, status_code=status.HTTP_201_CREATED)
+def appel_regulateur(
+    mission_id: int,
+    donnees: AppelRegulateur,
+    db: Session = Depends(get_db),
+    current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
+):
+    try:
+        alerte = appeler_regulateur(db, mission_id, current_user, donnees.raison)
+    except MissionSansAgent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Cette mission ne vous est pas attribuée") from None
+    except MissionPasEnCours:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="La mission n'est pas en cours : rien à signaler au régulateur") from None
+    return vers_alertes_out(db, [alerte])[0]
+
+
+# Bouton « Arrivé » : clôture par l'agent quand son badge n'a pas été détecté à l'arrivée (secours)
+@router.post("/{mission_id}/arrivee", response_model=MissionOut)
+def arrivee_declaree(
+    mission_id: int,
+    donnees: ActionHorsLigne | None = None,
+    db: Session = Depends(get_db),
+    current_user: Brancardier = Depends(require_role([Role.BRANCARDIER]))
+):
+    try:
+        mission = declarer_arrivee(db, mission_id, current_user,
+                                   donnees.horodatage_client if donnees else None)
+    except (MissionNonProposee, ReponseImpossible) as e:
+        db.rollback()
+        raise erreur_scan(e, "arrivée") from None
+    except HorodatageInvalide as e:
+        db.rollback()
+        raise erreur_horodatage(e) from None
     return vers_mission_out(db, mission)
 
 
@@ -347,6 +421,21 @@ def annuler(
 ):
     try:
         mission = annuler_mission(db, mission_id, current_user)
+    except (MissionIntrouvable, ActionImpossible) as e:
+        db.rollback()
+        raise erreur_regulation(e) from None
+    return vers_mission_out(db, mission)
+
+
+# Clôture par le régulateur : une mission en transit que ni le badge ni l'agent n'ont terminée
+@router.put("/{mission_id}/cloturer", response_model=MissionOut)
+def cloturer(
+    mission_id: int,
+    db: Session = Depends(get_db),
+    current_user: Utilisateur = Depends(require_role([Role.REGULATEUR]))
+):
+    try:
+        mission = cloturer_mission(db, mission_id, current_user)
     except (MissionIntrouvable, ActionImpossible) as e:
         db.rollback()
         raise erreur_regulation(e) from None

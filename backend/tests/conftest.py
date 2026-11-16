@@ -12,6 +12,10 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_db.as_posix()}"
 os.environ["SECRET_KEY"] = "cle_de_test"
 # Pas de tâches de fond pendant les tests : elles sont appelées directement quand il le faut
 os.environ["TACHES_FOND_INTERVALLE"] = "0"
+# Pas de minimum d'agents disponibles par défaut : les tests de pause qui le vérifient le fixent eux-mêmes
+os.environ["MIN_AGENTS_DISPONIBLES"] = "0"
+# Temps réel sans Redis : les écrans connectés sont prévenus directement
+os.environ["REDIS_URL"] = ""
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pytest

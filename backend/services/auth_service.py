@@ -1,6 +1,8 @@
 # services/auth_service.py
 
+import hashlib
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -48,7 +50,36 @@ def verify_password(mot_de_passe: str, hash: str) -> bool:
         return False
 
 
-#  Fonctions JWT 
+#  Carte de connexion (QR) des brancardiers
+# Le code imprimé est long et tiré au hasard (192 bits) : impossible à deviner. Comme il est déjà
+# aléatoire, une empreinte SHA-256 suffit à le protéger en base (pas besoin de bcrypt, qui sert
+# à ralentir les essais sur des mots de passe choisis par des humains), et elle permet de
+# retrouver le compte directement à partir du code scanné.
+
+PREFIXE_CARTE = "SBC-"   # « Smart-Brancard Carte » : reconnaît une carte parmi d'autres QR
+
+
+def empreinte_carte(code: str) -> str:
+    return hashlib.sha256(code.strip().encode("utf-8")).hexdigest()
+
+
+def nouvelle_carte(utilisateur: Utilisateur) -> str:
+    """Génère le code d'une nouvelle carte et enregistre son empreinte.
+    L'ancienne carte ne fonctionne plus. Le code n'est renvoyé qu'ici, une seule fois.
+    Ne fait pas de commit : l'appelant enregistre."""
+    code = PREFIXE_CARTE + secrets.token_urlsafe(24)
+    utilisateur.carte_hash = empreinte_carte(code)
+    return code
+
+
+def utilisateur_par_carte(db: Session, code: str) -> Utilisateur | None:
+    """Le compte à qui appartient ce code de carte, ou None"""
+    if not code or not code.strip().startswith(PREFIXE_CARTE):
+        return None
+    return db.query(Utilisateur).filter(Utilisateur.carte_hash == empreinte_carte(code)).first()
+
+
+#  Fonctions JWT
 
 def create_jwt_token(data: dict) -> str:
     """Génère un token JWT contenant les infos de l'utilisateur + expiration"""
@@ -57,12 +88,35 @@ def create_jwt_token(data: dict) -> str:
     to_encode.update({"exp": expiration})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
+def jeton_de_connexion(utilisateur: Utilisateur) -> dict:
+    """Réponse d'une connexion réussie (mot de passe ou carte) : le JWT et le rôle"""
+    token = create_jwt_token({
+        "sub": str(utilisateur.id),   # sub = subject (identifiant)
+        "role": utilisateur.role.value,
+        "nom": utilisateur.nom,
+        "prenom": utilisateur.prenom
+    })
+    return {"access_token": token, "token_type": "bearer", "role": utilisateur.role}
+
 def decode_jwt_token(token: str) -> dict | None:
     """Décode et vérifie un token JWT: retourne None si invalide ou expiré"""
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
         return None
+
+
+def utilisateur_du_jeton(db: Session, token: str) -> Utilisateur | None:
+    """Utilisateur actif désigné par un JWT valide, sinon None (routes HTTP et WebSocket)"""
+    payload = decode_jwt_token(token)
+    if not payload or not str(payload.get("sub", "")).isdigit():
+        return None
+    # On relit l'utilisateur en base: un compte supprimé ou désactivé n'a plus accès,
+    # même si son token n'a pas encore expiré
+    utilisateur = db.get(Utilisateur, int(payload["sub"]))
+    if utilisateur is None or not utilisateur.est_actif:
+        return None
+    return utilisateur
 
 
 #  Dépendances FastAPI (RBAC) 
@@ -78,14 +132,8 @@ def get_current_user(
         detail="Token invalide ou expiré, veuillez vous reconnecter",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    payload = decode_jwt_token(token)
-    if not payload or not str(payload.get("sub", "")).isdigit():
-        raise erreur
-
-    # On relit l'utilisateur en base: un compte supprimé ou désactivé n'a plus accès,
-    # même si son token n'a pas encore expiré
-    utilisateur = db.get(Utilisateur, int(payload["sub"]))
-    if utilisateur is None or not utilisateur.est_actif:
+    utilisateur = utilisateur_du_jeton(db, token)
+    if utilisateur is None:
         raise erreur
     return utilisateur
 

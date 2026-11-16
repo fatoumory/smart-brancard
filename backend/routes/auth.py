@@ -7,14 +7,15 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.enums import Role
 from models.utilisateur import Brancardier, Utilisateur
-from schemas.utilisateur import Token, UtilisateurCreate, UtilisateurOut
+from schemas.utilisateur import CarteConnexion, Token, UtilisateurCreate, UtilisateurOut
 from services.assignation_service import traiter_file_attente
 from services.auth_service import (
     hash_password,
     verify_password,
-    create_jwt_token,
+    jeton_de_connexion,
     get_current_user,
-    require_role
+    require_role,
+    utilisateur_par_carte,
 )
 
 # Préfixe commun à toutes les routes de ce fichier: /auth/...
@@ -85,14 +86,26 @@ def connexion(
         )
 
     # Génère le JWT contenant l'id et le rôle de l'utilisateur
-    token = create_jwt_token({
-        "sub": str(utilisateur.id),   # sub = subject (identifiant)
-        "role": utilisateur.role.value,
-        "nom": utilisateur.nom,
-        "prenom": utilisateur.prenom
-    })
+    return jeton_de_connexion(utilisateur)
 
-    return {"access_token": token, "token_type": "bearer", "role": utilisateur.role}
+
+#  Connexion par carte (brancardier)
+# L'agent scanne le QR de sa carte en début de garde : il est connecté 8 h, sans rien taper
+@router.post("/carte", response_model=Token)
+def connexion_par_carte(
+    donnees: CarteConnexion,
+    db: Session = Depends(get_db)
+):
+    utilisateur = utilisateur_par_carte(db, donnees.code)
+    if utilisateur is None:
+        # Carte inconnue, ou remplacée par une nouvelle (perdue) : elle ne fonctionne plus
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Carte non reconnue : demandez une nouvelle carte au régulateur",
+        )
+    if not utilisateur.est_actif:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Ce compte est désactivé")
+    return jeton_de_connexion(utilisateur)
 
 
 #  Profil de l'utilisateur connecté

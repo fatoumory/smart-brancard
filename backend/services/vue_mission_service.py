@@ -21,7 +21,7 @@ from models.utilisateur import Brancardier
 from schemas.mission import MissionOut
 from services.assignation_service import DELAIS_REPONSE, exclus_parmi
 from services.graphe_service import construire_graphe
-from services.position_service import en_utc, positions_actuelles
+from services.position_service import en_utc, positions_actuelles, prouve_la_presence
 
 # Statuts où l'agent rejoint le patient : l'arrivée estimée au point de départ a un sens
 STATUTS_EN_APPROCHE = {StatutMission.PROPOSE, StatutMission.ACCEPTE}
@@ -77,10 +77,11 @@ def construire_missions_out(db: Session, missions: list[Mission]) -> list[Missio
         assignation_auto = (derniere_proposition.auteur_id is None
                             if m.brancardier_id is not None and derniere_proposition else None)
 
-        # Horodatages des étapes clés (journal d'audit)
-        prise = next((en_utc(l.horodatage) for l in lignes
+        # Horodatages des étapes clés (journal d'audit). Pour une action faite hors ligne,
+        # c'est l'heure réelle donnée par le téléphone (déjà vérifiée) qui compte
+        prise = next((en_utc(l.horodatage_client or l.horodatage) for l in lignes
                       if l.statut_modifie_en == StatutMission.EN_TRANSIT), None)
-        fin = next((en_utc(l.horodatage) for l in reversed(lignes)
+        fin = next((en_utc(l.horodatage_client or l.horodatage) for l in reversed(lignes)
                     if l.statut_modifie_en in (StatutMission.TERMINE, StatutMission.ANNULE)), None)
 
         # Délai garanti respecté ? Connu à la prise en charge, ou dès qu'il est dépassé
@@ -108,6 +109,9 @@ def construire_missions_out(db: Session, missions: list[Mission]) -> list[Missio
             temps_agent = distances.get(m.noeud_source_id, {}).get(detection.noeud_id)
             if temps_agent is not None:
                 arrivee = maintenant + timedelta(minutes=temps_agent)
+        # Badge détecté au point de départ d'une mission acceptée : le téléphone ouvre la caméra
+        agent_au_depart = (m.statut == StatutMission.ACCEPTE
+                           and prouve_la_presence(detection, m.noeud_source_id, maintenant))
 
         resultat.append(MissionOut(
             id=m.id,
@@ -130,6 +134,7 @@ def construire_missions_out(db: Session, missions: list[Mission]) -> list[Missio
             assignation_auto=assignation_auto,
             temps_agent_min=temps_agent,
             arrivee_estimee=arrivee,
+            agent_au_depart=agent_au_depart,
             noeud_source_id=m.noeud_source_id,
             noeud_source_nom=noms_noeuds[m.noeud_source_id],
             noeud_destination_id=m.noeud_destination_id,

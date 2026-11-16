@@ -9,7 +9,7 @@ BRANCARDIER = {"nom_utilisateur": "moussa@test.fr", "prenom": "Moussa", "nom": "
 def test_tables_du_diagramme():
     from database import Base
     assert {"utilisateurs", "brancardiers", "patients", "noeuds_hopital", "aretes", "missions",
-            "historiques", "detections", "journaux_assistance"} == set(Base.metadata.tables)
+            "historiques", "detections", "journaux_assistance", "alertes"} == set(Base.metadata.tables)
 
 
 def test_login_ok_et_me(client):

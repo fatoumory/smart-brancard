@@ -28,20 +28,28 @@ class MissionCreate(BaseModel):
             raise ValueError("Le départ et l'arrivée doivent être différents")
         return self
 
-class RefusMission(BaseModel):
+class ActionHorsLigne(BaseModel):
+    """Champ commun aux actions de l'agent que le téléphone peut garder hors ligne
+    (ascenseur, sous-sol) et envoyer au retour du réseau : l'heure où l'action a été faite.
+    Absent : l'action vient d'être faite. Corps facultatif de accept et de arrivee."""
+    horodatage_client: datetime | None = None
+
+
+class RefusMission(ActionHorsLigne):
     """Corps de PUT /missions/{id}/refuse : le motif est obligatoire (CDC §7.3)"""
     motif: MotifRefus
 
 
-class ScanDepart(BaseModel):
-    """Corps de POST /missions/{id}/scan-depart : tag NFC de la salle puis QR du bracelet.
+class ScanDepart(ActionHorsLigne):
+    """Corps de POST /missions/{id}/scan-depart : QR du bracelet, et tag NFC de la salle
+    seulement si le badge de l'agent n'a pas été détecté au point de départ (secours).
     forcer_urgence=true : prise en charge sans scan, réservée aux missions URGENT (tracée)."""
     tag_nfc: str | None = Field(default=None, max_length=100)
     code_bracelet: str | None = Field(default=None, max_length=100)
     forcer_urgence: bool = False
 
 
-class ScanArrivee(BaseModel):
+class ScanArrivee(ActionHorsLigne):
     """Corps de POST /missions/{id}/scan-arrivee : tag NFC de la salle de destination"""
     tag_nfc: str = Field(min_length=1, max_length=100)
 
@@ -63,6 +71,8 @@ class HistoriqueOut(BaseModel):
     brancardier_id: int | None = None
     methode_verification: MethodeVerification
     motif_refus: MotifRefus | None
+    # Action faite hors ligne : heure réelle donnée par le téléphone (horodatage = réception)
+    horodatage_client: datetime | None = None
 
 class MissionOut(BaseModel):
     """Mission renvoyée au frontend, avec les noms utiles à l'affichage"""
@@ -92,6 +102,9 @@ class MissionOut(BaseModel):
     # et heure d'arrivée estimée (maquette du suivi médecin : « Arrivée estimée au point de départ »)
     temps_agent_min: float | None = None
     arrivee_estimee: datetime | None = None
+    # Mission ACCEPTE : le badge de l'agent vient d'être détecté au point de départ
+    # (le téléphone ouvre alors la caméra pour le scan du bracelet, sans geste de l'agent)
+    agent_au_depart: bool = False
 
     noeud_source_id: int
     noeud_source_nom: str
@@ -120,3 +133,17 @@ class MissionOut(BaseModel):
     # alerte pour le régulateur, qui peut réaffecter sans attendre la fin des exclusions (5 min)
     sans_candidat: bool = False
 
+
+
+#  État de la flotte (alerte « Saturation flotte » du dashboard)
+class SaturationOut(BaseModel):
+    # True : trop de missions en attente pour les agents disponibles
+    sature: bool
+    missions_en_attente: int
+    # Missions qui ont déjà dépassé leur délai garanti de prise en charge
+    missions_en_retard: int
+    agents_disponibles: int
+    # Seuil réglé dans le .env (SEUIL_SATURATION)
+    seuil: int
+    # Identifiants des missions en attente, dans l'ordre où elles seront servies
+    file: list[int]

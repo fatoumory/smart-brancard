@@ -14,28 +14,21 @@
 # pendant le choix, et un index unique interdit à un agent d'avoir deux missions actives.
 
 import math
+import os
 from datetime import date, datetime, timedelta, timezone
 
 import networkx as nx
-from sqlalchemy import case, func
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from models.enums import MotifRefus, NiveauUrgence, StatutAgent, StatutMission
+from models.enums import DELAI_GARANTI_MIN, MotifRefus, NiveauUrgence, StatutAgent, StatutMission
 from models.historique import Historique
 from models.mission import Mission
 from models.utilisateur import Brancardier
 from services.graphe_service import construire_graphe
-from services.historique_service import changer_statut
+from services.historique_service import changer_statut, verifier_horodatage_client
 from services.position_service import en_utc, positions_actuelles
-
-# Ordre de traitement de la file : les plus urgentes d'abord, puis les plus anciennes
-ORDRE_URGENCE = case(
-    {NiveauUrgence.URGENT: 0, NiveauUrgence.HAUTE: 1,
-     NiveauUrgence.MOYENNE: 2, NiveauUrgence.BASSE: 3},
-    value=Mission.niveau_urgence,
-)
-
 
 #  Compteur de missions du jour (diagramme : reinitialiser_compteur_journalier)
 
@@ -169,15 +162,33 @@ def assigner_automatiquement(db: Session, mission_id: int) -> Brancardier | None
     return agent
 
 
+#  Ordre de la file d'attente, avec vieillissement (CDC §5.4)
+# Trier seulement par urgence ferait attendre sans fin une mission BASSE dès que la flotte est chargée.
+# On sert donc d'abord la mission la plus proche de dépasser son délai garanti (3, 8, 15 ou 30 min) :
+# une mission BASSE qui attend depuis 25 min (échéance dans 5 min) passe avant une MOYENNE
+# qui vient d'arriver (échéance dans 15 min). Elle « vieillit » et gagne sa place.
+# Exception : l'URGENT (urgence vitale) passe toujours en premier, quelle que soit l'attente des autres.
+
+def echeance(mission: Mission) -> datetime:
+    """Heure à laquelle la mission dépasse son délai garanti de prise en charge"""
+    return en_utc(mission.date_creation) + timedelta(minutes=DELAI_GARANTI_MIN[mission.niveau_urgence])
+
+
+def cle_de_file(mission: Mission) -> tuple:
+    """Clé de tri de la file : URGENT d'abord, puis l'échéance la plus proche, puis la plus ancienne"""
+    return (mission.niveau_urgence != NiveauUrgence.URGENT, echeance(mission), mission.id)
+
+
+def missions_en_attente(db: Session) -> list[Mission]:
+    """Missions en attente d'un agent, dans l'ordre où elles seront servies"""
+    return sorted(db.query(Mission).filter(Mission.statut == StatutMission.EN_ATTENTE).all(), key=cle_de_file)
+
+
 def traiter_file_attente(db: Session) -> int:
-    """Propose les missions en attente aux agents libres, les plus urgentes et anciennes d'abord.
+    """Propose les missions en attente aux agents libres, dans l'ordre de la file (voir cle_de_file).
     À appeler après une création de mission, un refus, ou quand un agent redevient disponible.
     Renvoie le nombre de missions proposées."""
-    en_attente = [m_id for (m_id,) in
-                  db.query(Mission.id)
-                  .filter(Mission.statut == StatutMission.EN_ATTENTE)
-                  .order_by(ORDRE_URGENCE, Mission.date_creation, Mission.id)
-                  .all()]
+    en_attente = [m.id for m in missions_en_attente(db)]
     proposees = 0
     for mission_id in en_attente:
         if assigner_automatiquement(db, mission_id) is not None:
@@ -199,39 +210,66 @@ class ReponseImpossible(Exception):
     """La mission n'attend plus de réponse (déjà acceptée, annulée, réaffectée...)"""
 
 
+class DejaFait(Exception):
+    """L'action a déjà été enregistrée pour cet agent : le téléphone la renvoie (réponse perdue,
+    action gardée hors ligne). On renvoie la mission telle quelle, sans nouvelle ligne au journal."""
+
+    def __init__(self, mission: Mission):
+        super().__init__()
+        self.mission = mission
 
 
-def mission_proposee_a(db: Session, mission_id: int, agent: Brancardier) -> Mission:
-    """Verrouille la mission et vérifie qu'elle est proposée à cet agent et attend sa réponse"""
+# Statuts atteints après l'acceptation : une acceptation renvoyée est alors déjà faite
+APRES_ACCEPTATION = {StatutMission.ACCEPTE, StatutMission.EN_TRANSIT, StatutMission.TERMINE}
+
+
+def mission_proposee_a(db: Session, mission_id: int, agent: Brancardier,
+                       deja_fait: set[StatutMission] | None = None) -> Mission:
+    """Verrouille la mission et vérifie qu'elle est proposée à cet agent et attend sa réponse.
+    deja_fait : statuts où l'action de cet agent est déjà enregistrée (lève DejaFait)"""
     mission = db.query(Mission).filter(Mission.id == mission_id).with_for_update().one_or_none()
     if mission is None or mission.brancardier_id != agent.id:
         raise MissionNonProposee()
+    if deja_fait and mission.statut in deja_fait:
+        raise DejaFait(mission)
     if mission.statut != StatutMission.PROPOSE:
         raise ReponseImpossible()
     return mission
 
 
-def accepter_mission(db: Session, mission_id: int, agent: Brancardier) -> Mission:
+def accepter_mission(db: Session, mission_id: int, agent: Brancardier,
+                     horodatage_client: datetime | None = None) -> Mission:
     """L'agent accepte : la mission passe ACCEPTE (il rejoint le patient), l'agent reste EN_MISSION.
-    L'acceptation est une décision explicite de l'agent, tracée dans le journal (CDC §7.3)."""
-    mission = mission_proposee_a(db, mission_id, agent)
-    changer_statut(db, mission, StatutMission.ACCEPTE, auteur_id=agent.id, agent_id=agent.id)
+    L'acceptation est une décision explicite de l'agent, tracée dans le journal (CDC §7.3).
+    Une acceptation renvoyée (déjà enregistrée) renvoie la mission sans rien changer."""
+    try:
+        mission = mission_proposee_a(db, mission_id, agent, deja_fait=APRES_ACCEPTATION)
+    except DejaFait as e:
+        db.commit()   # rien n'a changé : on libère seulement le verrou
+        return e.mission
+    heure = verifier_horodatage_client(horodatage_client, mission)
+    changer_statut(db, mission, StatutMission.ACCEPTE, auteur_id=agent.id, agent_id=agent.id,
+                   horodatage_client=heure)
     agent.non_reponses = 0
     db.commit()
     return mission
 
 
-def refuser_mission(db: Session, mission_id: int, agent: Brancardier, motif: MotifRefus) -> Mission:
+def refuser_mission(db: Session, mission_id: int, agent: Brancardier, motif: MotifRefus,
+                    horodatage_client: datetime | None = None) -> Mission:
     """L'agent refuse avec un motif : la mission retourne en attente et sera proposée à un autre agent.
-    Le refus est tracé avec son motif ; il exclut l'agent des prochaines propositions de cette mission."""
+    Le refus est tracé avec son motif ; il exclut l'agent des prochaines propositions de cette mission.
+    Un refus renvoyé alors que la mission est déjà repartie est rejeté (404) : il n'est pas compté
+    deux fois."""
     mission = mission_proposee_a(db, mission_id, agent)
+    heure = verifier_horodatage_client(horodatage_client, mission)
     mission.brancardier_id = None
     changer_statut(db, mission, StatutMission.EN_ATTENTE, auteur_id=agent.id, motif_refus=motif,
-                   agent_id=agent.id)
+                   agent_id=agent.id, horodatage_client=heure)
     agent.non_reponses = 0
     if motif == MotifRefus.URGENCE_PRIORITAIRE:
         # Retenu par une autre urgence : il se met en pause, et revient quand il a fini
-        mettre_en_pause(agent)
+        mettre_en_pause(agent, DUREE_RETENUE_URGENCE_MIN)
     elif motif == MotifRefus.MATERIEL_DEFECTUEUX:
         # Son matériel est en cause, pas lui : il reste disponible (il peut en prendre au dépôt).
         # La mission, elle, attend la décision du régulateur (voir bloquee_pour_materiel)
@@ -250,12 +288,41 @@ def refuser_mission(db: Session, mission_id: int, agent: Brancardier, motif: Mot
 
 
 #  Pauses (diagramme : changer_statut, gerer_reprise_service_auto)
+# L'agent choisit quand il part en pause (30 min, ou 45 min pour le repas). Pour qu'il reste
+# toujours quelqu'un pour une urgence, la pause est refusée si elle laisserait moins de
+# MIN_AGENTS_DISPONIBLES agents disponibles. À la fin, le serveur le remet disponible.
 
-DUREE_PAUSE_DEFAUT_MIN = 15
+DUREE_PAUSE_DEFAUT_MIN = 30
+
+# Refus pour « urgence vitale prioritaire » : l'agent est retenu ailleurs, ce n'est pas une
+# vraie pause, il revient plus tôt
+DUREE_RETENUE_URGENCE_MIN = 15
+
+# Réglage de l'hôpital (.env) : nombre d'agents qui doivent rester disponibles (0 = pas de limite)
+MIN_AGENTS_DISPONIBLES = int(os.getenv("MIN_AGENTS_DISPONIBLES", "1"))
+
+
+class PauseImpossible(Exception):
+    """La pause laisserait trop peu d'agents disponibles (message destiné à l'agent)"""
 
 
 def maintenant() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def verifier_pause_possible(db: Session, agent: Brancardier) -> None:
+    """Refuse la pause d'un agent disponible si, sans lui, il resterait moins de
+    MIN_AGENTS_DISPONIBLES agents disponibles. Un agent déjà indisponible ne retire personne."""
+    if agent.statut != StatutAgent.DISPONIBLE or MIN_AGENTS_DISPONIBLES <= 0:
+        return
+    autres = (db.query(func.count(Brancardier.id))
+              .filter(Brancardier.est_actif.is_(True), Brancardier.statut == StatutAgent.DISPONIBLE,
+                      Brancardier.id != agent.id)
+              .scalar())
+    if autres < MIN_AGENTS_DISPONIBLES:
+        raise PauseImpossible(
+            f"Pause impossible pour l'instant : il doit rester au moins {MIN_AGENTS_DISPONIBLES} "
+            f"agent(s) disponible(s). Réessayez dans quelques minutes.")
 
 
 def mettre_en_pause(agent: Brancardier, minutes: int | None = None) -> None:

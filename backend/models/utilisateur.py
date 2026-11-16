@@ -28,6 +28,15 @@ class Utilisateur(Base):
     # Un compte désactivé ne peut plus se connecter (on ne supprime pas, pour l'auditabilité)
     est_actif = Column(Boolean, nullable=False, default=True)
 
+    # Carte de connexion (QR) d'un brancardier : on ne garde que l'empreinte SHA-256 du code imprimé,
+    # jamais le code lui-même. Vide tant qu'aucune carte n'a été générée.
+    carte_hash = Column(String(64), unique=True, nullable=True, index=True)
+
+    @property
+    def a_une_carte(self) -> bool:
+        """Une carte de connexion a été générée (utile au dashboard, sans révéler le code)"""
+        return self.carte_hash is not None
+
     # Héritage : un utilisateur de rôle BRANCARDIER est chargé comme un Brancardier,
     # dont les attributs propres sont dans la table "brancardiers"
     __mapper_args__ = {
