@@ -1,0 +1,503 @@
+<!doctype html><html lang="fr"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Feuille de route Smart-Brancard v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@87.5,600;87.5,700;100,500&family=Public+Sans:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Mise en page : une colonne de sprints empilés, chaque sprint en deux colonnes Backend / Frontend */
+:root{
+  --bg:#F3F6FA; --surface:#FFFFFF; --ink:#0D1B2A; --muted:#5C6E82; --line:#DCE3EC;
+  --blue:#1565C0; --blue-soft:#E3EAF6; --green:#1B8A6B; --green-soft:#E6F4EE;
+  --orange:#B84A00; --orange-soft:#FFF1E3; --red:#C62828; --red-soft:#FDECEC;
+  --violet:#5B45B0; --violet-soft:#EEEAFB;
+  --chip:#EDF1F6;
+  --display:"Archivo","Arial Narrow",Arial,sans-serif;
+  --body:"Public Sans","Segoe UI",Roboto,Arial,sans-serif;
+  --mono:"IBM Plex Mono",Consolas,"Courier New",monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E1620; --surface:#15202C; --ink:#E6EDF5; --muted:#93A4B8; --line:#26354A;
+    --blue:#7FB0F0; --blue-soft:#1A2D47; --green:#5CC9A5; --green-soft:#16332B;
+    --orange:#F2A15E; --orange-soft:#3A2614; --red:#F08080; --red-soft:#3D1C1F;
+    --violet:#B3A5F2; --violet-soft:#2A2445;
+    --chip:#1D2A39;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E1620; --surface:#15202C; --ink:#E6EDF5; --muted:#93A4B8; --line:#26354A;
+  --blue:#7FB0F0; --blue-soft:#1A2D47; --green:#5CC9A5; --green-soft:#16332B;
+  --orange:#F2A15E; --orange-soft:#3A2614; --red:#F08080; --red-soft:#3D1C1F;
+  --violet:#B3A5F2; --violet-soft:#2A2445;
+  --chip:#1D2A39;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;padding:0 16px}
+img{max-width:100%}
+.wrap{max-width:1080px;margin:0 auto;padding-block:40px 64px;display:flex;flex-direction:column;gap:40px}
+h1,h2,h3{font-family:var(--display);font-stretch:87.5%;margin:0;text-wrap:balance;line-height:1.15}
+h1{font-size:clamp(28px,4.5vw,40px);font-weight:700;letter-spacing:-.01em}
+h2{font-size:24px;font-weight:700}
+h3{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+p{margin:0}
+code{font-family:var(--mono);font-size:.86em;background:var(--chip);padding:1px 5px;border-radius:4px;white-space:nowrap}
+.eyebrow{font-family:var(--mono);font-size:12px;color:var(--blue);letter-spacing:.04em}
+
+header{display:flex;flex-direction:column;gap:14px}
+.lede{max-width:70ch;color:var(--muted);font-size:16px}
+.legend{display:flex;flex-wrap:wrap;gap:10px 22px;font-size:13px;color:var(--muted);align-items:center}
+.legend span{display:inline-flex;gap:8px;align-items:center}
+
+.tag{font-family:var(--mono);font-size:11px;font-weight:500;padding:2px 7px;border-radius:4px;white-space:nowrap;letter-spacing:.02em}
+.tag.plan{background:var(--chip);color:var(--muted)}
+.tag.add{background:var(--blue-soft);color:var(--blue)}
+.tag.done{background:var(--green-soft);color:var(--green)}
+.tag.new{background:var(--violet-soft);color:var(--violet)}
+.tag.part{background:var(--orange-soft);color:var(--orange)}
+.src{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:4px}
+.stat b{font-family:var(--display);font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:13.5px}
+
+/* comparaison avant / après du parcours */
+.journey{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.lane{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.lane.after{border-color:var(--violet)}
+.lane h3{color:var(--ink)}
+.lane.after h3{color:var(--violet)}
+.lane ol{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:8px;font-size:14.5px}
+.lane ol li::marker{font-family:var(--mono);color:var(--muted)}
+.gesture{font-family:var(--mono);font-size:11px;padding:1px 6px;border-radius:4px;background:var(--orange-soft);color:var(--orange);white-space:nowrap}
+.auto{font-family:var(--mono);font-size:11px;padding:1px 6px;border-radius:4px;background:var(--green-soft);color:var(--green);white-space:nowrap}
+.lane .count{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
+
+.decisions{display:flex;flex-direction:column;gap:14px}
+.decisions > p{color:var(--muted);max-width:70ch}
+.dec-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.dec{background:var(--orange-soft);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.dec h4{margin:0;font-family:var(--display);font-stretch:87.5%;font-size:16px;font-weight:700;color:var(--ink)}
+.dec p{font-size:14px}
+.dec .reco{font-size:13.5px;color:var(--ink)}
+.dec .reco strong{color:var(--orange)}
+.dec.done{background:var(--green-soft)}
+.dec.done .reco strong{color:var(--green)}
+.dec.new{background:var(--violet-soft)}
+.dec.new .reco strong{color:var(--violet)}
+
+.sprint{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.sprint-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px 16px;padding:20px 22px 16px;border-bottom:1px solid var(--line)}
+.sprint-head .t{display:flex;flex-direction:column;gap:4px}
+.sprint-head .goal{color:var(--muted);font-size:14px;max-width:72ch}
+.status{font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.status.done{background:var(--green-soft);color:var(--green)}
+.status.next{background:var(--blue-soft);color:var(--blue)}
+.status.later{background:var(--chip);color:var(--muted)}
+.cols{display:grid;grid-template-columns:1fr 1fr}
+.col{padding:18px 22px 22px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.col + .col{border-left:1px solid var(--line)}
+.who{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.who .dev{font-size:13px;color:var(--ink);font-weight:600}
+ul.tasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+ul.tasks li{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:start;font-size:14.5px}
+ul.tasks li .tag{margin-top:3px}
+ul.tasks li .txt{display:flex;flex-direction:column;gap:3px;min-width:0}
+ul.tasks li .sub{font-size:13.5px;color:var(--muted)}
+ul.tasks li.is-new .txt > span:first-child{font-weight:600}
+.note{margin:0 22px 20px;padding:12px 14px;border-radius:8px;background:var(--red-soft);font-size:13.5px}
+.note strong{color:var(--red)}
+.note.info{background:var(--violet-soft)}
+.note.info strong{color:var(--violet)}
+.cols.single{grid-template-columns:1fr}
+.prio{margin:0 22px 16px;padding-top:16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.prio-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.prio-item{border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;font-size:13.5px}
+.prio-item b{font-family:var(--display);font-stretch:87.5%;font-size:15px}
+.prio-item.p1{background:var(--red-soft)} .prio-item.p1 b{color:var(--red)}
+.prio-item.p2{background:var(--orange-soft)} .prio-item.p2 b{color:var(--orange)}
+.prio-item.p3{background:var(--chip)} .prio-item.p3 b{color:var(--muted)}
+@media (max-width:760px){.prio{margin-left:16px;margin-right:16px}}
+
+.tbl-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
+th,td{text-align:left;padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--display);font-stretch:87.5%;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;background:var(--chip)}
+tr:last-child td{border-bottom:0}
+td:first-child{font-weight:600}
+.section{display:flex;flex-direction:column;gap:14px}
+.section > p{color:var(--muted);max-width:70ch}
+footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:16px}
+
+@media (max-width:760px){
+  .cols,.journey{grid-template-columns:1fr}
+  .col + .col{border-left:0;border-top:1px solid var(--line)}
+  .sprint-head,.col{padding-left:16px;padding-right:16px}
+  .note{margin-left:16px;margin-right:16px}
+}
+</style>
+</head><body>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">SMART-BRANCARD · CARDIO-CONNECT · MÉTHODE SCRUM ALTERNÉE · VERSION 3 · MISE À JOUR APRÈS LE SPRINT 4</p>
+  <h1>Feuille de route après le Sprint 4</h1>
+  <p class="lede">Les sprints 0 à 4 sont terminés. Le Sprint 4 a changé de cap : au lieu de la dictée vocale du médecin, il a réduit les gestes du brancardier. Des badges, simulés dans le prototype, prouvent sa présence dans les salles ; il ne lui reste qu’un scan à faire, le bracelet du patient, et il se connecte en scannant sa carte. Le système continue de fonctionner sans Internet, les écrans se mettent à jour en temps réel, et le médecin admet un patient depuis son écran. Reste le Sprint 5 : tests de charge, analyse stochastique et livrables.</p>
+  <div class="legend">
+    <span><span class="tag done">Fait</span> constaté dans le dépôt</span>
+    <span><span class="tag part">En partie</span> commencé, à terminer</span>
+    <span><span class="tag plan">Prévu</span> déjà dans la feuille de route</span>
+    <span><span class="tag new">Nouveau</span> nouvelle configuration du parcours</span>
+    <span><span class="src">CDC §4.6</span> section du cahier des charges</span>
+  </div>
+</header>
+
+<div class="summary">
+  <div class="stat"><b>5 / 6</b><span>sprints terminés (0 à 4) : attribution automatique, parcours à gestes réduits, badges simulés, hors ligne, temps réel.</span></div>
+  <div class="stat"><b>200</b><span>tests automatiques du backend, tous les modules couverts (145 à la fin du Sprint 3).</span></div>
+  <div class="stat"><b>3 → 1</b><span>scan demandé au brancardier par mission : le bracelet seulement, au lieu de deux tags de salle et du bracelet.</span></div>
+  <div class="stat"><b>4</b><span>chantiers passés en perspective : la dictée vocale, les vrais badges BLE (ESP32), les annonces en wolof et l’équipement des agents en téléphones.</span></div>
+</div>
+
+<section class="section">
+  <h2>Le parcours du brancardier, avant et après</h2>
+  <p>La position et la présence dans une salle sont prouvées par le badge, plus par l’agent. Les gestes qui restent sont ceux qu’aucun capteur ne peut faire à sa place.</p>
+  <div class="journey">
+    <div class="lane">
+      <h3>Sprint 3 (avant)</h3>
+      <ol>
+        <li>Choisir sa position dans « Je suis à » <span class="gesture">geste</span></li>
+        <li>Accepter ou refuser la mission <span class="gesture">geste</span></li>
+        <li>Scanner le tag de la salle de départ <span class="gesture">geste</span></li>
+        <li>Scanner le bracelet du patient <span class="gesture">geste</span></li>
+        <li>Scanner le tag de la salle d’arrivée <span class="gesture">geste</span></li>
+        <li>Choisir une durée de pause ; reprise automatique à la fin</li>
+      </ol>
+      <p class="count">5 gestes par mission, dont 3 scans.</p>
+    </div>
+    <div class="lane after">
+      <h3>Sprint 4 (fait)</h3>
+      <ol>
+        <li>La mission est annoncée : sonnerie, vibration et voix (lieu, urgence, matériel) <span class="auto">automatique</span></li>
+        <li>Accepter, ou refuser avec un motif en image <span class="gesture">geste</span></li>
+        <li>Arrivée au départ détectée par le badge ; la caméra s’ouvre seule <span class="auto">automatique</span></li>
+        <li>Scanner le bracelet ; la voix confirme le bon patient et la salle d’arrivée <span class="gesture">geste</span></li>
+        <li>Arrivée détectée après 30 s dans la salle ; le médecin est prévenu <span class="auto">automatique</span></li>
+        <li>À la sortie de la salle, l’agent redevient disponible <span class="auto">automatique</span></li>
+      </ol>
+      <p class="count">2 gestes par mission, dont 1 scan. Secours : bouton « Arrivé », clôture par le régulateur, scans de salle conservés.</p>
+    </div>
+  </div>
+</section>
+
+<section class="decisions">
+  <h2>Décisions</h2>
+  <p>Les décisions de la version 2 restent valables, mises à jour par ce qui a été construit. Les décisions nouvelles sont en violet.</p>
+  <div class="dec-list">
+    <div class="dec new">
+      <h4>La présence est prouvée par un badge, simulé dans le prototype</h4>
+      <p>Dans un vrai hôpital, l’agent porte un badge BLE et un récepteur par salle (par exemple un ESP32) prévient le serveur. Dans le prototype, un simulateur envoie la même information : on y déplace les agents de salle en salle.</p>
+      <p class="reco"><strong>Pourquoi :</strong> le logiciel est réel et testé ; seul le capteur est simulé, comme le prévoit le CDC §1.4. Le simulateur remplace « Je suis à » : l’agent ne déclare plus rien.</p>
+    </div>
+    <div class="dec new">
+      <h4>Un seul scan obligatoire : le bracelet</h4>
+      <p>Le badge prouve la présence dans la salle de départ et d’arrivée. Le scan du bracelet reste, car lui seul garantit le bon patient.</p>
+      <p class="reco"><strong>Secours :</strong> les scans des tags de salle existent déjà et sont gardés si le badge ne répond pas. En URGENT, le départ sans scan reste possible et tracé.</p>
+    </div>
+    <div class="dec new">
+      <h4>Fonctionner sans Internet : serveur sur place et actions mises en attente</h4>
+      <p>Le serveur est installé dans l’hôpital, sur le réseau local : une coupure d’Internet n’arrête rien. Si le téléphone perd le réseau (ascenseur, sous-sol), il garde la mission en cours, met les actions de l’agent en attente et les envoie au retour du réseau, avec leur heure réelle.</p>
+      <p class="reco"><strong>Limite :</strong> si le serveur ou le Wi-Fi tombe en panne, aucune mission ne peut être attribuée ; on revient à une procédure de secours (téléphone, papier). Le mode hors ligne complet reste en perspective.</p>
+    </div>
+    <div class="dec new">
+      <h4>Le brancardier se connecte en scannant sa carte</h4>
+      <p>Le régulateur imprime pour chaque agent une carte avec un QR code personnel, collée au dos de son badge. En début de garde, l’agent la scanne et il est connecté pour 8 h, sans rien taper.</p>
+      <p class="reco"><strong>Limite :</strong> la carte vaut un mot de passe. Si elle est perdue, le régulateur en génère une nouvelle et l’ancienne ne marche plus ; chaque action reste tracée au journal. L’email et le mot de passe restent disponibles en secours, et pour le médecin et le régulateur.</p>
+    </div>
+    <div class="dec new">
+      <h4>Dictée vocale du médecin en perspective</h4>
+      <p>Remplir le formulaire prend quelques secondes au médecin. La voix sert davantage au brancardier, les mains sur le brancard : annonces des missions et confirmation du patient.</p>
+      <p class="reco"><strong>À valider</strong> avec les encadrants, car la dictée figurait au Sprint 4 de la version 2.</p>
+    </div>
+    <div class="dec new">
+      <h4>Annonces vocales en français ; le wolof en perspective</h4>
+      <p>La synthèse vocale du navigateur parle français gratuitement. Les annonces en wolof (enregistrées ou lues par une IA, avec une langue choisie par agent) sont prévues en perspective.</p>
+    </div>
+    <div class="dec done">
+      <h4>Pauses de 30 ou 45 min, refusées s’il ne resterait pas assez d’agents</h4>
+      <p>L’agent choisit 30 min, ou 45 min pour le repas ; le serveur le remet disponible à la fin, et il peut revenir plus tôt. La pause est refusée si, sans lui, il resterait moins d’agents disponibles que le réglage de l’hôpital (<code>MIN_AGENTS_DISPONIBLES</code>, 1 par défaut).</p>
+      <p class="reco"><strong>Pourquoi :</strong> la flotte reste toujours couverte pour les urgences, ce qui protège les délais garantis. Remplace la pause sans durée envisagée : avec une fin fixe, l’alerte après 30 min et le motif de refus « en pause » ne sont plus nécessaires.</p>
+    </div>
+    <div class="dec done">
+      <h4>Désactiver un compte, jamais le supprimer</h4>
+      <p>Les missions et le journal d’audit pointent vers les comptes. Les supprimer effacerait la trace de qui a demandé, transporté ou annulé.</p>
+    </div>
+    <div class="dec done">
+      <h4>Graphe de l’hôpital : 20 lieux sur 2 niveaux, en base</h4>
+      <p>Chargé depuis un fichier JSON, poids en minutes, attente des ascenseurs comprise, liens bloquables. Pas d’escalier : un brancard passe par un ascenseur.</p>
+    </div>
+    <div class="dec done">
+      <h4>Positions et statuts dans PostgreSQL</h4>
+      <p>Les détections sont une table de PostgreSQL ; une position de plus de 10 min est ignorée. Redis arrive avec le temps réel, pour diffuser les changements.</p>
+    </div>
+    <div class="dec done">
+      <h4>Valeurs communes au backend et au frontend</h4>
+      <p>Statuts de mission : <code>EN_ATTENTE</code>, <code>PROPOSE</code>, <code>ACCEPTE</code>, <code>EN_TRANSIT</code>, <code>TERMINE</code>, <code>ANNULE</code>. Le patient est identifié par son IPP, son nom et son prénom. Aucune donnée clinique.</p>
+    </div>
+    <div class="dec done">
+      <h4>File d’attente déterministe, analysée par un modèle stochastique</h4>
+      <p>En temps réel : priorité par urgence, puis par ancienneté. Le modèle stochastique sert à dimensionner la flotte et à vérifier les délais garantis (Sprint 5).</p>
+    </div>
+  </div>
+  <h2 style="margin-top:12px">Tranchées au Sprint 4</h2>
+  <div class="dec-list">
+    <div class="dec done">
+      <h4>L’agent appelle le régulateur par une alerte</h4>
+      <p>Bracelet illisible ou échecs de scan : un bouton crée une alerte sur le dashboard, tracée, sans doublon si l’agent appuie plusieurs fois. Le régulateur la marque comme traitée.</p>
+    </div>
+    <div class="dec done">
+      <h4>Méthode de vérification <code>BALISE</code> au journal</h4>
+      <p>Une arrivée détectée par le badge se distingue dans le journal d’une arrivée scannée ou déclarée (« Arrivé », clôture du régulateur).</p>
+    </div>
+    <div class="dec done">
+      <h4>Temps réel sans fuite de données</h4>
+      <p>Le WebSocket ne diffuse que le nom de ce qui a changé ; chaque écran relit ses données par les routes HTTP, qui vérifient le rôle. Le jeton est envoyé dans le premier message, jamais dans l’adresse. Rechargement de secours toutes les 30 s.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <h2>Les sprints</h2>
+
+  <!-- SPRINT 0 -->
+  <article class="sprint">
+    <div class="sprint-head">
+      <div class="t"><span class="eyebrow">SPRINT 0 · SEMAINES 1-2</span><h2>Environnement et prise en main</h2></div>
+      <span class="status done">Terminé</span>
+    </div>
+    <div class="cols single">
+      <div class="col">
+        <div class="who"><h3>En commun</h3></div>
+        <ul class="tasks">
+          <li><span class="tag done">Fait</span><span class="txt"><span>Dépôt GitHub partagé et <code>.gitignore</code> commun à Python et Node.js</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span><code>docker-compose.yml</code> avec PostgreSQL + PostGIS et Redis</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span><code>.env.example</code> et nom de base <code>smart_brancard_db</code> aligné partout</span></span></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+
+  <!-- SPRINT 1 -->
+  <article class="sprint">
+    <div class="sprint-head">
+      <div class="t"><span class="eyebrow">SPRINT 1 · SEMAINES 3-4</span><h2>Authentification et structure des données</h2></div>
+      <span class="status done">Terminé</span>
+    </div>
+    <div class="cols">
+      <div class="col">
+        <div class="who"><h3>Backend</h3><span class="dev">Développeuse A</span></div>
+        <ul class="tasks">
+          <li><span class="tag done">Fait</span><span class="txt"><span>Modèles <code>Utilisateur</code>, <code>Mission</code>, <code>Patient</code></span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span><code>POST /auth/register</code>, <code>POST /auth/login</code>, <code>GET /auth/me</code></span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Jetons JWT valables 8 h et restriction des routes par rôle (RBAC)</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Script <code>seed.py</code> pour le premier régulateur</span></span></li>
+        </ul>
+      </div>
+      <div class="col">
+        <div class="who"><h3>Frontend</h3><span class="dev">Développeuse B</span></div>
+        <ul class="tasks">
+          <li><span class="tag done">Fait</span><span class="txt"><span>Application React + Vite</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Écran de connexion adapté aux rôles</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Stockage du jeton et pages protégées par rôle</span></span></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+
+  <!-- SPRINT 2 -->
+  <article class="sprint">
+    <div class="sprint-head">
+      <div class="t"><span class="eyebrow">SPRINT 2 · SEMAINES 5-6</span><h2>Missions et itinéraires Dijkstra</h2><p class="goal">Créer une mission depuis l’interface Médecin, calculer son itinéraire et l’afficher au régulateur.</p></div>
+      <span class="status done">Terminé</span>
+    </div>
+    <div class="cols">
+      <div class="col">
+        <div class="who"><h3>Backend</h3><span class="dev">Développeuse B</span></div>
+        <ul class="tasks">
+          <li><span class="tag done">Fait</span><span class="txt"><span>Modèles alignés sur le modèle de données validé, migrations Alembic</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Graphe JSON de 20 lieux sur 2 niveaux, chargé en base, Dijkstra avec NetworkX</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Bloquer ou débloquer une arête (ascenseur en panne, couloir fermé), réservé au régulateur</span><span class="sub">Route prête ; l’écran du régulateur est prévu au Sprint 4.</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span><code>POST /missions/create</code>, réservé au médecin, avec itinéraire et durée estimée</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Admission des patients : IPP et bracelet <code>QR-&lt;IPP&gt;</code> générés, identité provisoire pour un patient inconnu</span><span class="sub">Routes prêtes ; l’écran d’admission est prévu au Sprint 4.</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Journal d’audit : une ligne par changement de statut, rendu immuable par un déclencheur PostgreSQL</span><span class="src">CDC §7.3</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Routes de lecture : missions avec filtres, détail, historique, lieux</span></span></li>
+        </ul>
+      </div>
+      <div class="col">
+        <div class="who"><h3>Frontend</h3><span class="dev">Développeuse A</span></div>
+        <ul class="tasks">
+          <li><span class="tag done">Fait</span><span class="txt"><span>Application installable (PWA)</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Dashboard du régulateur : file des missions triée par urgence, itinéraire en étapes</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Interface Médecin : demande de transport et suivi de la demande</span></span></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+
+  <!-- SPRINT 3 -->
+  <article class="sprint">
+    <div class="sprint-head">
+      <div class="t"><span class="eyebrow">SPRINT 3 · SEMAINES 7-8</span><h2>Affectation intelligente et suivi mobile</h2><p class="goal">Attribuer chaque mission au bon brancardier, puis la suivre du départ à l’arrivée.</p></div>
+      <span class="status done">Terminé</span>
+    </div>
+    <div class="cols">
+      <div class="col">
+        <div class="who"><h3>Backend</h3><span class="dev">Développeuse A</span></div>
+        <ul class="tasks">
+          <li><span class="tag done">Fait</span><span class="txt"><span>Position des agents : détections enregistrées, position de plus de 10 min ignorée</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Attribution automatique : score = temps de trajet + k × missions du jour, k = 0 en URGENT</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Verrous en base et index unique : jamais deux agents sur une mission</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Accepter, refuser avec 4 motifs ; délai de réponse de 30, 45 ou 60 s selon l’urgence</span><span class="sub">Exclusion de 5 min après un refus, indisponible après 2 non-réponses, alertes « Sans candidat » et « Matériel défectueux ».</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Scans de départ (tag de salle + bracelet, forçage en URGENT) et d’arrivée</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Réaffectation manuelle et annulation par le régulateur ; journal du brancardier</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Pauses de 15 ou 45 min avec reprise automatique</span><span class="sub">Remplacées au Sprint 4 par des pauses de 30 ou 45 min, avec retour anticipé possible.</span></span></li>
+        </ul>
+      </div>
+      <div class="col">
+        <div class="who"><h3>Frontend</h3><span class="dev">Développeuse B</span></div>
+        <ul class="tasks">
+          <li><span class="tag done">Fait</span><span class="txt"><span>Application mobile du brancardier : mission, journal, profil</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Mission proposée : détails, motif de refus, compte à rebours</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Parcours en 5 étapes ; scan QR par la caméra, NFC (Chrome Android), QR de secours</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Mode HTTPS pour tester sur téléphone, avec un proxy vers l’API</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Statut : disponible, pause, indisponible ; position « Je suis à »</span><span class="sub">« Je suis à » est remplacé au Sprint 4 par le simulateur de badges.</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Dashboard : agents, alertes, taux dans les délais, menu réaffecter ou annuler</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Suivi du médecin : garantie de prise en charge (délai, agent, position, arrivée estimée)</span></span></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+
+  <!-- SPRINT 4 -->
+  <article class="sprint">
+    <div class="sprint-head">
+      <div class="t"><span class="eyebrow">SPRINT 4 · SEMAINES 9-10</span><h2>Parcours à gestes réduits, hors ligne et temps réel</h2><p class="goal">Le brancardier n’a plus qu’à accepter et scanner le bracelet ; le système résiste aux coupures de réseau ; tous les écrans se mettent à jour sans être rechargés.</p></div>
+      <span class="status done">Terminé</span>
+    </div>
+    <div class="cols">
+      <div class="col">
+        <div class="who"><h3>Backend</h3><span class="dev">Développeuse B</span></div>
+        <ul class="tasks">
+          <li><span class="tag done">Fait</span><span class="txt"><span>Route du simulateur de badges (<code>POST /detections/badge</code>) : détection d’un badge dans une salle, toutes les 5 s</span><span class="sub">Elle reçoit ce qu’enverrait un récepteur ESP32 : agent, salle, heure. Réservée au simulateur, pas au téléphone de l’agent.</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Arrivée au départ détectée : le téléphone en est informé pour ouvrir la caméra</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Scan de départ avec le bracelet seul quand le badge prouve la présence</span><span class="sub">Le scan du tag de salle reste accepté en secours.</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Arrivée détectée après 30 s de présence dans la salle de destination : mission terminée, méthode <code>BALISE</code> au journal</span><span class="sub">30 s pour ignorer un simple passage.</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Agent disponible à la sortie de la salle, ou après 10 min sans détection</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Secours : clôture par l’agent (« Arrivé ») ou par le régulateur, tracée au journal</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Appel du régulateur après 2 ou 3 échecs de scan ou un bracelet illisible</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Pauses de 30 ou 45 min, retour anticipé possible, refusées s’il ne resterait pas assez d’agents disponibles</span><span class="sub">Remplace la pause sans durée prévue : voir les décisions.</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Actions envoyées hors ligne : acceptées au retour du réseau, avec leur heure réelle, sans être comptées deux fois</span><span class="sub">Une action déjà enregistrée ou devenue impossible (mission réaffectée entre-temps) est ignorée proprement.</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Connexion du brancardier par carte QR : un code secret par agent, échangé contre le jeton de connexion de 8 h</span><span class="sub">Une route réservée au régulateur régénère la carte et rend l’ancienne inutilisable. Le code est stocké haché, comme un mot de passe.</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Redis Pub/Sub et WebSockets : mission proposée, changement de statut, arrivée, alertes</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Saturation : file triée par urgence puis ancienneté, avec vieillissement, et alerte « Saturation flotte »</span><span class="src">CDC §5.4</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Désactivation d’un compte (<code>PATCH /utilisateurs/{id}</code>), réservée au régulateur</span><span class="sub">Avec la réactivation ; un compte n’est jamais supprimé.</span></span></li>
+        </ul>
+      </div>
+      <div class="col">
+        <div class="who"><h3>Frontend</h3><span class="dev">Développeuse B ; admission et « Mes demandes » : Développeuse A</span></div>
+        <ul class="tasks">
+          <li><span class="tag done">Fait</span><span class="txt"><span>Écran du simulateur : plan de l’hôpital où l’on déplace chaque agent de salle en salle</span><span class="sub">Remplace « Je suis à » ; c’est la personne qui fait la démonstration qui joue le rôle des badges.</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Bouton « Scanner ma carte » sur l’écran de connexion ; impression de la carte depuis le dashboard du régulateur</span><span class="sub">Reprend le scanner QR du Sprint 3. Le formulaire email et mot de passe reste en dessous.</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Annonce de la mission : sonnerie, vibration (Android) et voix en français</span><span class="sub">Un bouton « Activer le son » à l’ouverture, car le navigateur bloque le son avant un premier toucher.</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Gros boutons Accepter et Refuser, motifs en images lus par la voix</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Caméra ouverte seule à l’arrivée au départ ; la voix dit « bon patient » ou « mauvais patient »</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Parcours sans scan de salle, bouton « Arrivé » et bouton d’appel au régulateur</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Pause : choix de 30 ou 45 min, « Je reprends », message clair si la pause est refusée</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Hors ligne : mission en cours gardée sur le téléphone, actions mises en attente et renvoyées au retour du réseau</span><span class="sub">Un bandeau indique à l’agent que le réseau est coupé ; seule la mission en cours est gardée (CDC §7.2).</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Écran d’admission des patients dans l’interface Médecin</span><span class="sub">Créer un patient quand la recherche ne le trouve pas, identité provisoire pour un patient inconnu, choix en cas d’homonyme. Les routes existent déjà (<code>POST /patients</code>, <code>PATCH /patients/{id}</code>) ; aujourd’hui, l’admission ne se fait que par l’API.</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Liste « Mes demandes » du médecin</span><span class="sub">Retrouver ses demandes et leur suivi après avoir quitté la page. La route existe déjà (<code>GET /missions</code>).</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Dashboard : alertes d’appel, clôture manuelle d’une mission en transit</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Tous les écrans connectés au WebSocket <code>/ws</code>, indicateur de connexion, bandeau « Saturation flotte »</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Écran de blocage des ascenseurs et couloirs ; page Comptes (impression des cartes, désactivation, réactivation, recherche)</span></span></li>
+        </ul>
+      </div>
+    </div>
+    <p class="note info"><strong>Pour la démonstration :</strong> le simulateur capte les badges toutes les 5 s tant que sa page est ouverte chez le régulateur. Fermée, les positions vieillissent et l’arrivée n’est plus détectée (il reste le bouton « Arrivé ») : garder l’onglet du simulateur ouvert pendant la soutenance.</p>
+  </article>
+
+  <!-- SPRINT 5 -->
+  <article class="sprint">
+    <div class="sprint-head">
+      <div class="t"><span class="eyebrow">SPRINT 5 · SEMAINES 11-12</span><h2>Simulation de charge, validation et livrables</h2><p class="goal">Prouver que le système tient la charge et que le jury peut tout lancer en une commande.</p></div>
+      <span class="status next">Prochain sprint</span>
+    </div>
+    <div class="cols single">
+      <div class="col">
+        <div class="who"><h3>En commun</h3></div>
+        <ul class="tasks">
+          <li><span class="tag plan">Prévu</span><span class="txt"><span><code>locustfile.py</code> : 50 brancardiers virtuels qui acceptent, refusent et terminent des missions</span><span class="sub">Leurs badges passent par la route du simulateur du Sprint 4.</span></span></li>
+          <li><span class="tag plan">Prévu</span><span class="txt"><span>Import des CSV de démonstration MIMIC-III dans PostgreSQL</span><span class="sub">Seuls les rythmes de transferts entre services sont utilisés, pas les patients ni les lieux.</span></span></li>
+          <li><span class="tag plan">Prévu</span><span class="txt"><span>Analyse stochastique de la file d’attente</span><span class="sub">Demandes par heure tirées de MIMIC-III, file à plusieurs serveurs avec priorités : attente par niveau d’urgence comparée aux délais garantis (3, 8, 15 et 30 min), agents nécessaires par créneau. Vérifiée par simulation et comparée aux mesures Locust.</span><span class="src">CDC §5.6</span></span></li>
+          <li><span class="tag plan">Prévu</span><span class="txt"><span>Dockerfiles du backend et du frontend, lancement en une commande</span><span class="src">CDC §6.4</span></span></li>
+          <li><span class="tag plan">Prévu</span><span class="txt"><span>Jeu de données de démonstration : salles avec leurs tags, agents, patients avec leurs bracelets</span></span></li>
+          <li class="is-new"><span class="tag new">Nouveau</span><span class="txt"><span>Scénario de démonstration du nouveau parcours, avec le simulateur de badges</span></span></li>
+          <li><span class="tag plan">Prévu</span><span class="txt"><span>Vérifications de sécurité (403 par rôle) et README final</span></span></li>
+        </ul>
+      </div>
+    </div>
+  </article>
+</section>
+
+<section class="section">
+  <h2>Limites connues</h2>
+  <p>Ce que le prototype ne prouve pas, ou ne couvre pas, et ce qui est prévu pour réduire chaque limite. À reprendre dans le rapport.</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Limite</th><th>Conséquence</th><th>Ce qui la réduit</th></tr></thead>
+      <tbody>
+        <tr><td>Badges simulés</td><td>Un vrai badge BLE peut être capté à travers un mur ou depuis le couloir ; le seuil de 30 s n’est pas validé sur place.</td><td>Scans de salle et bouton « Arrivé » en secours ; seuil réglable ; essai sur 2 ou 3 salles si des ESP32 sont obtenus. En démonstration, la page du simulateur doit rester ouverte.</td></tr>
+        <tr><td>Serveur ou Wi-Fi en panne</td><td>Aucune mission ne peut être attribuée.</td><td>Serveur sur le réseau de l’hôpital (Internet non nécessaire) ; procédure de secours par téléphone ou papier.</td></tr>
+        <tr><td>Téléphone sans réseau</td><td>Les actions de l’agent arrivent en retard au serveur.</td><td>Mission gardée sur le téléphone, actions renvoyées avec leur heure réelle, sans doublon.</td></tr>
+        <tr><td>Un smartphone par agent</td><td>Le budget des hôpitaux ne le garantit pas.</td><td>Pistes en perspective : téléphones partagés par garde, appel vocal pour les téléphones simples.</td></tr>
+        <tr><td>Application web</td><td>Elle ne sonne que si elle est ouverte ; pas de vibration sur iPhone ; le son est bloqué avant un premier toucher.</td><td>Bouton « Activer le son » à l’ouverture ; notifications push ou application Android en perspective.</td></tr>
+        <tr><td>Bruit dans les services</td><td>L’annonce vocale peut ne pas être entendue.</td><td>Sonnerie et vibration avec l’annonce ; les informations restent affichées en gros sur l’écran.</td></tr>
+        <tr><td>Annonces en français seulement</td><td>Certains agents comprennent mieux le wolof.</td><td>Motifs en images ; wolof en perspective.</td></tr>
+        <tr><td>Carte QR de connexion</td><td>Une carte trouvée permet de se connecter à la place de l’agent.</td><td>Régénération par le régulateur, ancienne carte inutilisable, toutes les actions tracées au journal.</td></tr>
+        <tr><td>Pas d’essai avec de vrais agents</td><td>Le gain de temps sur le terrain n’est pas mesuré.</td><td>Tests de charge Locust et analyse stochastique au Sprint 5 ; essai réel en perspective.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section">
+  <h2>Perspectives et bonus</h2>
+  <p>Hors des 12 semaines. Chacun est à traiter seulement s’il reste du temps, ou à retirer officiellement du périmètre avec l’accord des encadrants.</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Fonctionnalité</th><th>Source</th><th>Pourquoi hors du périmètre</th></tr></thead>
+      <tbody>
+        <tr><td>Dictée vocale du médecin (Whisper) et ordres vocaux du régulateur</td><td class="src">Feuille de route v2</td><td>Remplacée au Sprint 4 par le parcours à gestes réduits, plus utile sur le terrain.</td></tr>
+        <tr><td>Annonces vocales en wolof</td><td class="src">Revue des encadrants</td><td>Demande d’enregistrer le vocabulaire (lieux, urgences, matériel) ou une voix IA de qualité suffisante, et une langue choisie par agent. Le prototype parle français.</td></tr>
+        <tr><td>Équipement des agents en téléphones</td><td class="src">Revue des encadrants</td><td>Le prototype suppose un smartphone par agent, ce que le budget des hôpitaux ne garantit pas. Pistes : quelques téléphones partagés par garde, une application Android native (qui sonne même fermée ; pas de vibration sur iPhone depuis le web), un appel vocal automatique pour les téléphones simples.</td></tr>
+        <tr><td>Vrais badges BLE et récepteurs ESP32</td><td class="src">CDC §1.4</td><td>Demande du matériel installé dans un hôpital. Démonstration possible sur 2 ou 3 salles si des ESP32 sont obtenus ; le serveur ne change pas.</td></tr>
+        <tr><td>Notifications push (Firebase)</td><td class="src">CDC §4.7</td><td>Seul moyen de prévenir l’agent quand l’application est fermée ; les WebSockets couvrent l’application ouverte.</td></tr>
+        <tr><td>Mode hors ligne complet</td><td class="src">CDC §6.5</td><td>Le minimum est fait au Sprint 4 (serveur sur place, mission gardée, actions renvoyées). Fonctionner sans serveur demanderait une synchronisation complexe à fiabiliser.</td></tr>
+        <tr><td>Prédiction des pics d’activité (LSTM)</td><td class="src">CDC §5.6</td><td>Remplacée par l’analyse stochastique du Sprint 5. À confirmer avec les encadrants.</td></tr>
+        <tr><td>Graphiques de performance (D3.js)</td><td class="src">CDC §8, module 3</td><td>Le taux dans les délais est déjà affiché ; les graphiques ne sont pas nécessaires au fonctionnement.</td></tr>
+        <tr><td>HTTPS et WSS en production</td><td class="src">CDC §7.1</td><td>Le HTTPS de test existe pour le téléphone ; la production passe par un reverse proxy.</td></tr>
+        <tr><td>Détour par le dépôt de matériel dans le score</td><td class="src">Maquette</td><td>Le calcul de base reste valable sans lui.</td></tr>
+        <tr><td>Rôle Administrateur</td><td class="src">Diagramme</td><td>Le régulateur crée et désactivera les comptes.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer>Sources : feuille de route officielle et version 2 du 25/09/2026, cahier des charges Smart-Brancard / Cardio-Connect, diagramme de classes v3, maquette Figma, proposition de parcours à gestes réduits, revue avec les encadrants et état du dépôt au 16/11/2026 (PR #20 et #21 fusionnées).</footer>
+
+</div>
+
+</body></html>
