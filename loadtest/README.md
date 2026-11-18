@@ -71,3 +71,35 @@ Sans `--headless`, l'interface de Locust s'ouvre sur http://localhost:8089 (cour
 - avec `--csv`, les fichiers de Locust : temps de réponse de chaque route, erreurs.
 
 À la fin, les missions de test encore en cours sont annulées.
+
+## Analyse de la file d'attente
+
+[analyse_file_attente.py](analyse_file_attente.py) répond à la question : combien d'agents faut-il, selon la
+période et le nombre de transports par séjour, pour respecter les délais garantis ?
+
+```bash
+python analyse_file_attente.py        # environ 20 s ; --rapide pour un essai
+```
+
+Deux approches, avec les mêmes hypothèses que Locust :
+
+1. **Modèle analytique** : file M/M/c à priorités non préemptives (formule de Cobham). Il donne la charge
+   des agents et l'attente moyenne dans la file.
+2. **Simulation à événements discrets** : elle reprend les règles de l'application (plan de l'hôpital et
+   Dijkstra, ordre de la file, score de choix de l'agent, refus et retenue de 15 min). La prise en charge
+   est le scan du bracelet, comme dans le backend.
+
+Les deux donnent la même occupation des agents, ce qui valide la simulation. Les résultats sont dans
+[analyse_file_attente_resultats.md](analyse_file_attente_resultats.md) (tableaux pour le rapport) et, en
+détail, dans `resultats/analyse_file_attente.csv`.
+
+### Comparer un test Locust à la simulation
+
+```bash
+python analyse_file_attente.py --comparer resultats/<test>_synthese.json
+```
+
+Un test Locust ne représente qu'une journée : la simulation rejoue 200 journées dans les mêmes conditions et
+donne la fourchette attendue. Le tableau est écrit dans [comparaison_locust.md](comparaison_locust.md).
+Écart connu : le téléphone virtuel interroge le serveur toutes les secondes réelles, soit 15 s d'hôpital à
+chaque étape avec `ACCEL=15` ; les attentes Locust sont donc plus longues d'environ 0,4 min.
