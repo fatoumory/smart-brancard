@@ -52,8 +52,9 @@ NB_PATIENTS = 60
 
 # Demandes par seconde (temps accéléré)
 DEBIT_PAR_S = H.demandes_par_heure(PERIODE, TRANSPORTS) * ACCEL / 3600
-# Rafraîchissement du téléphone (GET /missions/moi) et renvoi du badge quand l'agent attend
-INTERVALLE_SONDAGE_S = 1 if SCENARIO == "charge" else 2
+# Rafraîchissement du téléphone (GET /missions/moi) et renvoi du badge quand l'agent attend.
+# 1 s réelle = ACCEL secondes d'hôpital de retard possible à chaque étape : à garder court
+INTERVALLE_SONDAGE_S = 1
 INTERVALLE_BADGE_S = 60
 
 DOSSIER_RESULTATS = Path(__file__).parent / "resultats"
@@ -92,15 +93,43 @@ def creer_compte(hote: str, reg: dict, nom_utilisateur: str, role: str, nom: str
         r.raise_for_status()
 
 
+def regler_agents_de_test(hote: str, actifs: set[str]) -> int:
+    """Active les comptes de test du scénario et désactive les autres (ceux d'un essai précédent avec plus
+    d'agents). Un compte resté disponible sans personne derrière recevrait des propositions jamais
+    acceptées : chaque mission attendrait la fin du délai de réponse. Renvoie le nombre de comptes désactivés."""
+    r = requests.get(f"{hote}/utilisateurs", headers=Partage.reg_entetes, params={"role": "BRANCARDIER"},
+                     timeout=30)
+    r.raise_for_status()
+    desactives = 0
+    for u in r.json():
+        if not u["nom_utilisateur"].startswith("locust.agent"):
+            continue
+        voulu = u["nom_utilisateur"] in actifs
+        if u["est_actif"] != voulu:
+            r = requests.patch(f"{hote}/utilisateurs/{u['id']}", headers=Partage.reg_entetes,
+                               json={"est_actif": voulu}, timeout=30)
+            if not r.ok:
+                print(f"[Smart-Brancard] {u['nom_utilisateur']} : {r.status_code} {r.text}")
+                continue
+            desactives += not voulu
+    return desactives
+
+
+def nom_agent(numero: int) -> str:
+    return f"locust.agent{numero:02d}@smartbrancard.local"
+
+
 def annuler_missions_de_test(hote: str) -> int:
-    """Annule les missions encore actives créées par le médecin de test (essais précédents)"""
+    """Termine les missions encore actives créées par le médecin de test : une mission en transit est
+    clôturée (le régulateur ne peut pas annuler un transport en cours), les autres sont annulées"""
     r = requests.get(f"{hote}/missions", headers=Partage.reg_entetes, timeout=60, params={
         "statut": ["EN_ATTENTE", "PROPOSE", "ACCEPTE", "EN_TRANSIT"], "limite": 500})
     r.raise_for_status()
     annulees = 0
     for m in r.json():
         if m["prescripteur_id"] == Partage.medecin_id:
-            if requests.put(f"{hote}/missions/{m['id']}/annuler", headers=Partage.reg_entetes,
+            action = "cloturer" if m["statut"] == "EN_TRANSIT" else "annuler"
+            if requests.put(f"{hote}/missions/{m['id']}/{action}", headers=Partage.reg_entetes,
                             timeout=30).ok:
                 annulees += 1
     return annulees
@@ -116,7 +145,7 @@ def preparer(environment, **_):
     # Comptes de test : un médecin et les brancardiers
     creer_compte(hote, Partage.reg_entetes, MEDECIN_TEST, "MEDECIN", "Medecin")
     for i in range(1, NB_AGENTS + 1):
-        creer_compte(hote, Partage.reg_entetes, f"locust.agent{i:02d}@smartbrancard.local", "BRANCARDIER",
+        creer_compte(hote, Partage.reg_entetes, nom_agent(i), "BRANCARDIER",
                      f"Agent{i:02d}")
     medecin = connexion(hote, MEDECIN_TEST, MOT_DE_PASSE_TEST)
     Partage.medecin_id = requests.get(f"{hote}/auth/me", headers=medecin, timeout=30).json()["id"]
@@ -133,11 +162,13 @@ def preparer(environment, **_):
         Partage.patients.append(r.json()["id"])
 
     annulees = annuler_missions_de_test(hote)
+    desactives = regler_agents_de_test(hote, {nom_agent(i) for i in range(1, NB_AGENTS + 1)})
     Partage.debut = datetime.now(timezone.utc)
     print(f"[Smart-Brancard] Scénario {SCENARIO} : {NB_AGENTS} agents, période {PERIODE}, "
           f"{TRANSPORTS} transports/séjour, accélération x{ACCEL:g}, "
           f"{DEBIT_PAR_S * 3600 / ACCEL:.1f} demandes/h d'hôpital, {DUREE_MIN:g} min réelles "
-          f"({DUREE_MIN * ACCEL / 60:.1f} h d'hôpital) ; {annulees} anciennes missions annulées")
+          f"({DUREE_MIN * ACCEL / 60:.1f} h d'hôpital) ; {annulees} anciennes missions annulées, "
+          f"{desactives} comptes de test en trop désactivés")
 
 
 # --- Profil de charge ------------------------------------------------------------------------
@@ -197,7 +228,7 @@ class Brancardier(HttpUser):
 
     def on_start(self):
         numero = next(compteur_agents)
-        self.entetes = connexion(self.host, f"locust.agent{numero:02d}@smartbrancard.local", MOT_DE_PASSE_TEST)
+        self.entetes = connexion(self.host, nom_agent(numero), MOT_DE_PASSE_TEST)
         self.id = self.client.get("/auth/me", headers=self.entetes, name="/auth/me").json()["id"]
         self.lieu = random.choice(Partage.services)
         self.dernier_badge = 0.0
@@ -241,14 +272,16 @@ class Brancardier(HttpUser):
         elif mission["statut"] == "ACCEPTE":
             # Trajet jusqu'au patient, détection du badge au départ, puis scan du bracelet dès qu'il est
             # près du patient : c'est la prise en charge (passage EN_TRANSIT), qui compte pour le délai garanti
-            time.sleep(s_reelles(mission.get("temps_agent_min") or 2))
+            # 0 min si l'agent est déjà sur place ; None seulement si sa position est inconnue
+            trajet = mission.get("temps_agent_min")
+            time.sleep(s_reelles(2 if trajet is None else trajet))
             self.badge(mission["noeud_source_id"])
             self.client.post(f"/missions/{mid}/scan-depart", headers=self.entetes, name="/missions/[id]/scan-depart",
                              json={"code_bracelet": f"QR-{mission['patient_ipp']}"})
 
         elif mission["statut"] == "EN_TRANSIT":
             # Installation du patient, transport, détection du badge à l'arrivée, remise, puis « Arrivé »
-            time.sleep(s_reelles(H.DUREE_INSTALLATION_MIN + (mission.get("duree_estimee") or 5)))
+            time.sleep(s_reelles(H.DUREE_INSTALLATION_MIN + (5 if mission.get("duree_estimee") is None else mission["duree_estimee"])))
             self.badge(mission["noeud_destination_id"])
             time.sleep(s_reelles(H.DUREE_REMISE_MIN))
             self.client.post(f"/missions/{mid}/arrivee", headers=self.entetes, name="/missions/[id]/arrivee")
@@ -286,7 +319,7 @@ def exporter(environment, **_):
         })
 
     synthese = {"scenario": SCENARIO, "agents": NB_AGENTS, "periode": PERIODE, "transports_par_sejour": TRANSPORTS,
-                "acceleration": ACCEL, "demandes_par_heure": round(H.demandes_par_heure(PERIODE, TRANSPORTS), 2),
+                "acceleration": ACCEL, "duree_hopital_h": DUREE_MIN * ACCEL / 60, "demandes_par_heure": round(H.demandes_par_heure(PERIODE, TRANSPORTS), 2),
                 "par_urgence": {}}
     for urgence, delai in H.DELAIS_GARANTIS_MIN.items():
         attentes = [l["attente_min_hopital"] for l in lignes if l["urgence"] == urgence and l["attente_min_hopital"] != ""]
@@ -310,5 +343,8 @@ def exporter(environment, **_):
                                                             encoding="utf-8")
     print(json.dumps(synthese, indent=2, ensure_ascii=False))
 
+    # Fin de service : missions en cours annulées, comptes de test désactivés (ils ne recevront plus rien)
     annulees = annuler_missions_de_test(hote)
-    print(f"[Smart-Brancard] Résultats dans loadtest/resultats/{nom}_* ; {annulees} missions en cours annulées")
+    regler_agents_de_test(hote, set())
+    print(f"[Smart-Brancard] Résultats dans loadtest/resultats/{nom}_* ; {annulees} missions en cours annulées, "
+          f"comptes de test désactivés")
