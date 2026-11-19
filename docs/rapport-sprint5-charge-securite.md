@@ -139,7 +139,7 @@ Une matrice déclare, pour chacune des 36 routes de l'API, qui a le droit de l'a
 4. un compte désactivé perd l'accès immédiatement, même avec un jeton encore valide ;
 5. un médecin ne peut pas consulter les missions d'un autre médecin. La réponse est « introuvable » (404) plutôt que « interdit », pour ne pas révéler leur existence.
 
-L'efficacité des tests a été vérifiée : en ouvrant volontairement une route réservée au régulateur à un médecin, les tests ont bien échoué. L'ensemble du backend compte désormais 210 tests automatiques, tous réussis.
+L'efficacité des tests a été vérifiée : en ouvrant volontairement une route réservée au régulateur à un médecin, les tests ont bien échoué. L'ensemble du backend compte désormais 215 tests automatiques, tous réussis (dont 5 pour les agents postés et réservés aux URGENT).
 
 ## 6. Limites
 
