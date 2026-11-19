@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bracelets et tags de démonstration</title>
+<!-- Feuille à imprimer pour la démonstration (docs/scenario-demonstration.md) :
+     les bracelets QR des patients créés par backend/seed_demo.py, et les QR de secours des tags de salle.
+     Les QR sont dessinés dans le navigateur par la bibliothèque qrcode-generator (connexion Internet
+     nécessaire à l'ouverture ; une fois imprimée, la feuille sert hors ligne). -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 24px; color: #0f172a; background: #fff; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 24px 0 8px; text-transform: uppercase; letter-spacing: .06em; color: #1565c0; }
+  p { margin: 0 0 12px; color: #475569; font-size: 13px; }
+  .grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+  .carte { border: 1px dashed #94a3b8; border-radius: 10px; padding: 10px; text-align: center; break-inside: avoid; }
+  .carte svg { width: 120px; height: 120px; }
+  .nom { font-weight: 700; font-size: 14px; }
+  .code { font-family: ui-monospace, monospace; font-size: 12px; color: #334155; }
+  @media print { body { margin: 8mm; } p.ecran { display: none; } }
+</style>
+</head>
+<body>
+<h1>Smart-Brancard · bracelets et tags de démonstration</h1>
+<p>Patients et salles créés par <code>backend/seed_demo.py</code> et <code>backend/data/graphe_hopital.json</code>.</p>
+<p class="ecran">Imprimer la page (Ctrl + P), ou la laisser ouverte sur un écran et la scanner avec le téléphone.
+Le code sous chaque QR peut aussi être tapé au clavier dans l'application.</p>
+
+<h2>Bracelets des patients</h2>
+<div class="grille" id="bracelets"></div>
+
+<h2>Tags des salles (QR de secours du tag NFC)</h2>
+<div class="grille" id="tags"></div>
+
+<script>
+  // Mêmes valeurs que backend/seed_demo.py (PATIENTS) : le bracelet contient « QR-<IPP> »
+  const PATIENTS = [
+    ["90000001", "Abdoulaye Diouf"], ["90000002", "Ndeye Mbaye"], ["90000003", "Mamadou Kane"],
+    ["90000004", "Seynabou Cisse"], ["90000005", "Pape Seck"], ["90000006", "Astou Thiam"],
+    ["90000007", "Moustapha Diallo"], ["90000008", "INCONNU X-90000008"],
+  ];
+  // Tags NFC des salles (backend/data/graphe_hopital.json, champ uid_tag_nfc)
+  const TAGS = [
+    ["NFC-RDC-URG", "Urgences"], ["NFC-RDC-RAD", "Radiologie"], ["NFC-RDC-CONS", "Consultations externes"],
+    ["NFC-RDC-LAB", "Laboratoire"], ["NFC-RDC-DEP", "Dépôt matériel - RDC"], ["NFC-E1-BLOC", "Bloc opératoire"],
+    ["NFC-E1-REV", "Salle de réveil"], ["NFC-E1-REA", "Réanimation"], ["NFC-E1-CARD", "Cardiologie"],
+    ["NFC-E1-DEP", "Dépôt matériel - Étage 1"],
+  ];
+
+  // Une carte : le QR du code, le nom, puis le code en clair
+  function carte(code, nom) {
+    const qr = qrcode(0, "M");
+    qr.addData(code);
+    qr.make();
+    const div = document.createElement("div");
+    div.className = "carte";
+    div.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+    const n = document.createElement("div");
+    n.className = "nom";
+    n.textContent = nom;
+    const c = document.createElement("div");
+    c.className = "code";
+    c.textContent = code;
+    div.append(n, c);
+    return div;
+  }
+
+  for (const [ipp, nom] of PATIENTS) document.getElementById("bracelets").append(carte(`QR-${ipp}`, nom));
+  for (const [code, nom] of TAGS) document.getElementById("tags").append(carte(code, nom));
+</script>
+</body>
+</html>
