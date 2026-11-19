@@ -8,11 +8,12 @@ from models.enums import Role, StatutAgent, StatutMission
 from models.mission import Mission
 from models.noeud_hopital import NoeudHopital
 from models.utilisateur import Brancardier, Utilisateur
-from schemas.utilisateur import ActivationCompte, CarteOut, StatutUpdate, UtilisateurOut
+from schemas.utilisateur import ActivationCompte, AffectationUpdate, CarteOut, StatutUpdate, UtilisateurOut
 from services.assignation_service import (PauseImpossible, mettre_en_pause, traiter_file_attente,
                                           verifier_pause_possible)
 from services.auth_service import nouvelle_carte, require_role
-from services.compte_service import CompteIntrouvable, DesactivationImpossible, changer_activation
+from services.compte_service import (CompteIntrouvable, DesactivationImpossible, PasUnBrancardier,
+                                     PosteInconnu, changer_activation, changer_affectation)
 from services.position_service import est_recente, positions_actuelles
 
 # Préfixe commun à toutes les routes de ce fichier: /utilisateurs/...
@@ -66,6 +67,29 @@ def activer_ou_desactiver(
     except DesactivationImpossible as e:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from None
+
+
+#  Poste d'attente et agent réservé aux URGENT (régulateur)
+# Exemple : {"poste_id": 6, "reserve_urgent": true} = l'agent attend au Hall central du RDC
+# entre deux missions et ne reçoit que des URGENT. {"poste_id": null, "reserve_urgent": false} : retour
+# à un agent polyvalent sans poste.
+@router.patch("/{utilisateur_id}/affectation", response_model=UtilisateurOut)
+def changer_poste_et_reservation(
+    utilisateur_id: int,
+    donnees: AffectationUpdate,
+    db: Session = Depends(get_db),
+    _: Utilisateur = Depends(require_role([Role.REGULATEUR]))
+):
+    try:
+        return changer_affectation(db, utilisateur_id, donnees.poste_id, donnees.reserve_urgent)
+    except CompteIntrouvable:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur introuvable") from None
+    except PasUnBrancardier:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            detail="Le poste d'attente et la réservation concernent seulement les brancardiers") from None
+    except PosteInconnu:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Poste inconnu : aucun lieu de ce numéro dans le plan") from None
 
 
 #  Carte de connexion d'un brancardier (régulateur)

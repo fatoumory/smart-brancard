@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from models.enums import StatutAgent, StatutMission
 from models.mission import Mission
+from models.noeud_hopital import NoeudHopital
 from models.utilisateur import Brancardier, Utilisateur
 from services.assignation_service import traiter_file_attente
 from services.historique_service import changer_statut
@@ -62,3 +63,40 @@ def changer_activation(db: Session, utilisateur_id: int, est_actif: bool, regula
         traiter_file_attente(db)
     db.refresh(utilisateur)
     return utilisateur
+
+
+#  Poste d'attente et agent réservé aux URGENT (rapport Sprint 5, § 4.3)
+# La simulation de la file d'attente montre que le délai URGENT (3 min) dépend surtout de la place
+# des agents : avec 6 agents, dont 2 postés au centre de chaque étage et réservés aux URGENT,
+# 94 % des URGENT sont pris en charge à temps, contre 68 % sans poste.
+
+class PasUnBrancardier(Exception):
+    """Le poste et la réservation ne concernent que les brancardiers"""
+
+
+class PosteInconnu(Exception):
+    """Aucun lieu de ce numéro dans le plan de l'hôpital"""
+
+
+def changer_affectation(db: Session, utilisateur_id: int, poste_id: int | None,
+                        reserve_urgent: bool) -> Brancardier:
+    """Fixe le poste d'attente d'un brancardier (None : aucun) et le réserve ou non aux URGENT.
+    Une mission déjà proposée ou en cours n'est pas reprise à l'agent : le réglage vaut pour
+    les propositions suivantes."""
+    agent = db.get(Utilisateur, utilisateur_id)
+    if agent is None:
+        raise CompteIntrouvable()
+    if not isinstance(agent, Brancardier):
+        raise PasUnBrancardier()
+    if poste_id is not None and db.get(NoeudHopital, poste_id) is None:
+        raise PosteInconnu()
+
+    agent.poste_id = poste_id
+    agent.reserve_urgent = reserve_urgent
+    db.commit()
+
+    # Un agent qui n'est plus réservé peut prendre tout de suite une mission qui attendait
+    if not reserve_urgent:
+        traiter_file_attente(db)
+    db.refresh(agent)
+    return agent

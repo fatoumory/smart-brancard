@@ -36,6 +36,7 @@ ACCES = {
     ("GET", "/utilisateurs"): {REG},
     ("PATCH", "/utilisateurs/{utilisateur_id}"): {REG},
     ("POST", "/utilisateurs/{utilisateur_id}/carte"): {REG},
+    ("PATCH", "/utilisateurs/{utilisateur_id}/affectation"): {REG},
     ("PATCH", "/utilisateurs/me/statut"): {BRA},
     # Plan de l'hôpital
     ("GET", "/noeuds"): CONNECTE,

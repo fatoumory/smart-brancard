@@ -143,6 +143,8 @@ class SaturationOut(BaseModel):
     # Missions qui ont déjà dépassé leur délai garanti de prise en charge
     missions_en_retard: int
     agents_disponibles: int
+    # Parmi les agents disponibles, ceux qui sont réservés aux URGENT
+    agents_reserves_urgent: int = 0
     # Seuil réglé dans le .env (SEUIL_SATURATION)
     seuil: int
     # Identifiants des missions en attente, dans l'ordre où elles seront servies
