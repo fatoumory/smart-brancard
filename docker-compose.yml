@@ -1,3 +1,13 @@
+# Smart-Brancard en une seule commande (CDC §6.4) :
+#     docker compose up --build
+# puis ouvrir http://localhost:8088 (comptes de démonstration : voir readme.md).
+#
+# Pour le développement, on peut aussi ne lancer que la base et Redis :
+#     docker compose up -d db redis
+# et démarrer le backend (uvicorn) et le frontend (npm run dev) à la main, comme avant.
+#
+# Les valeurs ${...} se règlent dans le fichier .env à la racine (voir .env.example).
+
 services:
   db:
     image: postgis/postgis:16-3.4
@@ -13,15 +23,63 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # Le backend attend que la base réponde (au premier lancement, PostgreSQL crée d'abord la base)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-smart_brancard_db}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
   redis:
     image: redis:7-alpine
     container_name: smart_brancard_redis
     restart: always
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
+
+  # API FastAPI : migrations, plan de l'hôpital et données de démonstration au démarrage
+  # (voir backend/demarrage.py)
+  backend:
+    build: ./backend
+    container_name: smart_brancard_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      # Dans Docker, la base et Redis s'appellent par le nom de leur service (db, redis)
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-smart_brancard_db}
+      REDIS_URL: redis://redis:6379/0
+      # Vide : une clé temporaire est tirée à chaque démarrage (à fixer dans .env pour garder les sessions)
+      SECRET_KEY: ${SECRET_KEY:-}
+      # Le navigateur passe par nginx (même adresse) ; ces origines servent seulement si l'on
+      # appelle l'API directement depuis un frontend lancé avec npm run dev
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      # 1 : comptes, équipe et patients de démonstration (seed_demo.py). Mettre 0 hors démonstration
+      DEMO: ${DEMO:-1}
+      MIN_AGENTS_DISPONIBLES: ${MIN_AGENTS_DISPONIBLES:-1}
+      SEUIL_SATURATION: ${SEUIL_SATURATION:-3}
+      WORKERS: ${WORKERS:-2}
+    ports:
+      # API directe : documentation Swagger sur http://localhost:8000/docs, tests de charge Locust
+      - "${BACKEND_PORT:-8000}:8000"
+
+  # PWA servie par nginx, qui transmet /api au backend (voir frontend/nginx.conf)
+  frontend:
+    build: ./frontend
+    container_name: smart_brancard_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      # Ordinateur : http://localhost:8088
+      - "${FRONTEND_PORT:-8088}:80"
+      # Téléphone du même Wi-Fi : https://<adresse IP du PC>:8443 (caméra et NFC exigent le HTTPS)
+      - "${FRONTEND_PORT_HTTPS:-8443}:443"
 
 volumes:
   postgres_data:

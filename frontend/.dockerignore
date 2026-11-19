@@ -1,0 +1,6 @@
+# Fichiers à ne pas copier dans l'image du frontend
+node_modules/
+dist/
+dev-dist/
+# Réglages locaux (adresse de l'API) : dans Docker, l'API est toujours sous /api
+*.local

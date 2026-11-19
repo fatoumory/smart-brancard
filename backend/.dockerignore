@@ -1,0 +1,8 @@
+# Fichiers à ne pas copier dans l'image du backend
+venv/
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+# Réglages locaux : dans Docker, les variables viennent de docker-compose.yml
+.env
+*.db
