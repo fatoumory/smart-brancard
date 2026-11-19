@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, ChevronDown,CircleAlert, CircleCheck, Clock, Coffee, LogOut, Moon, Navigation, UtensilsCrossed } from "lucide-react";
+import { Bell, ChevronDown, CircleAlert, CircleCheck, Clock, Coffee, LogOut, MapPinHouse, Moon, Navigation, UtensilsCrossed } from "lucide-react";
 import MissionProposee from "./MissionProposee";
 import MissionEnCours from "./MissionEnCours";
 import { parler } from "../../services/voix";
@@ -89,14 +89,18 @@ function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onA
     if (moi.statut === "EN_MISSION") {
         return (
             <Etat icone={Navigation} couleur="text-primaire" fond="bg-primaire-clair" titre="Remise du patient"
-                texte="Vous redevenez disponible dès que vous quittez la salle (au plus tard 10 min après l'arrivée)." />
+                texte="Vous redevenez disponible dès que vous quittez la salle (au plus tard 10 min après l'arrivée).">
+                {/* Agent posté : après la remise, il retourne attendre à son poste */}
+                {moi.poste_nom && <Poste moi={moi} texte="Ensuite, retournez à votre poste :" />}
+            </Etat>
         );
     }
 
     // DISPONIBLE
     return (
         <Etat icone={CircleCheck} couleur="text-emerald-700" fond="bg-emerald-50" titre="Disponible"
-            texte="En attente d'une mission de la régulation.">
+            texte={moi.reserve_urgent ? "Vous recevez seulement les missions URGENT." : "En attente d'une mission de la régulation."}>
+            {moi.poste_nom && <Poste moi={moi} texte="Attendez à votre poste :" />}
             <p className="w-full p-4 rounded-2xl bg-primaire-clair text-primaire text-sm flex items-start gap-3 text-left">
                 <Bell className="w-5 h-5 shrink-0" />
                 La mission apparaîtra ici dès que la régulation vous l'aura attribuée.
@@ -112,6 +116,20 @@ function EcranMission({ moi, mission, changerStatut, envoi, rechargerProfil, onA
 
             <BoutonIndisponible onClick={passerIndisponible} envoi={envoi} />
         </Etat>
+    );
+}
+
+// Poste d'attente choisi par le régulateur (ex : Hall central - RDC). Placé au centre de l'étage,
+// l'agent y atteint vite tous les services : c'est ce qui permet de tenir le délai URGENT de 3 min.
+function Poste({ moi, texte }) {
+    return (
+        <p className="w-full p-4 rounded-2xl bg-white border-2 border-primaire text-left flex items-start gap-3">
+            <MapPinHouse className="w-6 h-6 text-primaire shrink-0" />
+            <span>
+                <span className="block text-sm text-slate-500">{texte}</span>
+                <span className="block text-lg font-bold text-slate-900">{moi.poste_nom}</span>
+            </span>
+        </p>
     );
 }
 

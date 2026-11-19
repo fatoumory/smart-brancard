@@ -71,6 +71,9 @@ function EcranProfil({ moi }) {
 
             <section className="bg-white rounded-3xl shadow-sm divide-y divide-slate-100">
                 <Ligne libelle="Missions réalisées" valeur={`${moi.compteur_mission ?? 0} aujourd'hui`} />
+                {/* Réglés par le régulateur (page Comptes) */}
+                <Ligne libelle="Poste d'attente" valeur={moi.poste_nom ?? "Aucun"} />
+                <Ligne libelle="Missions reçues" valeur={moi.reserve_urgent ? "URGENT seulement" : "Toutes"} />
                 <Ligne libelle="Identifiant" valeur={moi.nom_utilisateur} />
                 <Ligne libelle="Session" valeur="8 h (durée d'une garde)" />
             </section>

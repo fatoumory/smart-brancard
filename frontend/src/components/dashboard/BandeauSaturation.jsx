@@ -13,6 +13,10 @@ function BandeauSaturation({ etat }) {
                 <p className="text-sm text-white/90">
                     {etat.missions_en_attente} missions en attente pour {etat.agents_disponibles} agent{etat.agents_disponibles > 1 ? "s" : ""} disponible{etat.agents_disponibles > 1 ? "s" : ""}
                     {etat.missions_en_retard > 0 && `, dont ${etat.missions_en_retard} au-delà du délai garanti`}.
+                    {/* Agents libres mais réservés aux URGENT : ils ne prennent pas les autres missions */}
+                    {etat.agents_reserves_urgent > 0 && (etat.agents_reserves_urgent > 1
+                        ? ` ${etat.agents_reserves_urgent} de ces agents sont réservés aux URGENT.`
+                        : " L'un d'eux est réservé aux URGENT.")}
                     {" "}Rappelez des agents en pause ou reportez les transports les moins urgents.
                 </p>
             </div>
