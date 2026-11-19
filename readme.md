@@ -13,9 +13,51 @@ Un médecin ou un infirmier demande le transport d'un patient. L'application cal
 | Temps réel | WebSocket `/ws`, Redis Pub/Sub (Docker) | Les écrans sont prévenus dès qu'une donnée change |
 | Frontend | React, Vite (PWA) | Dashboard du régulateur, interface Médecin, application du brancardier |
 
-## Lancer le projet
+## Lancer le projet en une commande (Docker)
 
-Prérequis : Docker Desktop, Python 3.10 ou plus, Node.js.
+Prérequis : Docker Desktop, rien d'autre (ni Python ni Node.js).
+
+À la racine du projet :
+```powershell
+docker compose up --build
+```
+Au démarrage, le backend attend la base, applique les migrations, charge le plan de l'hôpital et le jeu de démonstration, puis lance l'API. Tout est prêt quand le journal affiche `Application startup complete`. Le premier lancement prend plusieurs minutes, le temps de construire les images.
+
+| Quoi | Adresse |
+|---|---|
+| Application (PC) | http://localhost:8088 |
+| Application (téléphone du même Wi-Fi, caméra et NFC) | https://&lt;IP du PC&gt;:8443, puis accepter le certificat auto-signé |
+| Documentation de l'API (Swagger) | http://localhost:8000/docs |
+
+**Comptes de démonstration** (mot de passe `demo1234`, créés par `backend/seed_demo.py`) :
+
+| Rôle | Identifiant |
+|---|---|
+| Régulateur | `regulateur@demo.sn` |
+| Médecins | `dr.diallo@demo.sn`, `dr.ndiaye@demo.sn` |
+| Brancardiers polyvalents | `ibrahima.fall@demo.sn`, `fatou.sow@demo.sn`, `cheikh.ba@demo.sn`, `aminata.diop@demo.sn` |
+| Brancardiers postés, réservés aux URGENT | `ousmane.gueye@demo.sn` (Hall central - RDC), `khady.faye@demo.sn` (Palier central - Étage 1) |
+
+S'y ajoutent 8 patients, de `QR-90000001` à `QR-90000008` : leurs bracelets sont à imprimer depuis `docs/demo/bracelets.html`. Le déroulé complet de la démonstration est dans [docs/scenario-demonstration.md](docs/scenario-demonstration.md).
+
+**Commandes utiles :**
+
+| Commande | Effet |
+|---|---|
+| `docker compose up --build -d` | Lancer en arrière-plan |
+| `docker compose logs -f backend` | Suivre le journal de l'API |
+| `docker compose down` | Tout arrêter (les données restent) |
+| `docker compose down -v` | Tout arrêter **et effacer la base** |
+| `docker compose up --build` après un `git pull` | Reconstruire avec la nouvelle version (migrations appliquées seules) |
+
+**Réglages** dans le fichier `.env` à la racine (copier `.env.example`) :
+- **un port déjà pris** (`POSTGRES_PORT`, `FRONTEND_PORT`…) ;
+- **`SECRET_KEY` vide par défaut :** une clé temporaire est tirée à chaque démarrage, et il faut se reconnecter après un redémarrage ;
+- **`DEMO=0` hors démonstration :** les mots de passe de démonstration sont connus de tous. Il faut alors créer le premier régulateur avec `docker compose exec backend python seed.py --nom-utilisateur ... --nom ... --prenom ...`.
+
+## Lancer le projet à la main (développement)
+
+Pour modifier le code avec rechargement automatique. Prérequis : Docker Desktop, Python 3.10 ou plus, Node.js.
 
 **1. Configuration (une seule fois)**
 ```powershell
@@ -24,9 +66,9 @@ copy backend\.env.example backend\.env
 ```
 Dans `backend/.env`, renseigner `SECRET_KEY`. Le fichier explique comment la générer.
 
-**2. Base de données**
+**2. Base de données et Redis** (seulement eux : le backend et le frontend tournent à la main)
 ```powershell
-docker compose up -d
+docker compose up -d db redis
 ```
 
 **3. Backend** (dans `backend/`)
@@ -42,6 +84,7 @@ uvicorn main:app --reload
 - `alembic upgrade head` crée et met à jour les tables.
 - `seed_graphe.py` charge le plan de l'hôpital.
 - `seed.py` crée le premier compte régulateur. Le mot de passe est demandé, et sa saisie est masquée.
+- Ou bien `python seed_demo.py`, qui crée les comptes, l'équipe et les patients de démonstration (voir plus haut).
 
 L'API répond sur http://localhost:8000, et sa documentation interactive est sur **http://localhost:8000/docs**.
 
@@ -93,6 +136,7 @@ Dijkstra (NetworkX) calcule le plus court chemin. Une arête **bloquée** par le
 | `POST /auth/carte` | brancardier | Connexion en scannant sa carte QR (même jeton de 8 h) |
 | `POST /auth/register` | régulateur | Créer un compte |
 | `PATCH /utilisateurs/{id}` | régulateur | Désactiver ou réactiver un compte (jamais de suppression) |
+| `PATCH /utilisateurs/{id}/affectation` | régulateur | Poste d'attente d'un brancardier et réservation aux URGENT |
 | `POST /utilisateurs/{id}/carte` | régulateur | Générer la carte de connexion d'un brancardier (l'ancienne ne fonctionne plus) |
 | `PATCH /utilisateurs/me/statut` | brancardier | Disponible, pause de 30 ou 45 min, indisponible |
 | `POST /patients` | prescripteur | Admettre un patient (IPP et bracelet `QR-<IPP>` générés, identité provisoire possible) |
@@ -139,7 +183,7 @@ Après la connexion, chaque rôle arrive sur son propre écran. Un utilisateur q
 | Connexion | `/login` | Choix du profil, puis identifiant et mot de passe. Le brancardier peut aussi scanner sa carte (« Scanner ma carte ») |
 | Dashboard du régulateur | `/regulateur` | Bandeau « Saturation flotte », appels des agents, 5 indicateurs, file des missions (réaffecter, annuler, clôturer), agents et leur position, activité de la journée, blocage des ascenseurs et couloirs. Mis à jour en temps réel |
 | Simulateur de badges | `/regulateur/simulateur` | Plan de l'hôpital : on pose chaque agent dans une salle, son badge y est capté toutes les 5 s |
-| Comptes | `/regulateur/comptes` | Impression des cartes de connexion, désactivation et réactivation des comptes |
+| Comptes | `/regulateur/comptes` | Recherche par nom ou prénom, poste d'attente et « URGENT seulement » des brancardiers, impression des cartes de connexion, désactivation et réactivation des comptes |
 | Demande de transport | `/medecin` | Recherche du patient (ou admission s'il est introuvable), urgence et délai garanti, départ et arrivée, matériel, consigne |
 | Mes demandes · Suivi | `/medecin/demandes` · `/medecin/suivi/{id}` | Les demandes du médecin, puis les étapes de chacune avec l'agent, sa position et l'arrivée estimée |
 | Brancardier | `/brancardier` | Application mobile : annonce vocale des missions, accepter ou refuser (motifs en images), caméra ouverte seule au départ, bracelet seul, arrivée détectée, bouton « Arrivé », appel au régulateur, pauses, mode hors ligne |
@@ -215,6 +259,7 @@ npm run build
 - **Actions hors ligne** : le téléphone peut renvoyer une action avec son heure réelle (`horodatage_client`), refusée si elle est dans le futur, avant la mission ou vieille de plus de 30 min ; le journal garde les deux heures. Une action déjà enregistrée et renvoyée n'est pas comptée deux fois.
 - **File d'attente avec vieillissement** : l'URGENT passe toujours en premier ; les autres missions sont servies par échéance (création + délai garanti). Une mission BASSE qui attend depuis longtemps passe donc devant une MOYENNE qui vient d'arriver. La flotte est « saturée » quand au moins `SEUIL_SATURATION` missions (`.env`, 3 par défaut) attendent et qu'il y en a plus que d'agents disponibles.
 - **Temps réel** : à chaque validation en base, le serveur repère les tables modifiées et envoie seulement le sujet (`missions`, `agents`, `alertes`, `graphe`) aux écrans connectés au WebSocket `/ws`. L'écran recharge alors ses données par les routes habituelles, qui vérifient les droits : aucune donnée patient ne passe par le WebSocket. Avec `REDIS_URL`, les sujets passent par Redis Pub/Sub, pour plusieurs processus du serveur. Les écrans se rechargent aussi toutes les 30 s, en secours.
+- **Agents postés, réservés aux URGENT (Sprint 5)** : la simulation de la file d'attente (`loadtest/`) montre que le délai URGENT de 3 min dépend surtout de la place des agents. Le régulateur peut donc donner à un brancardier un poste d'attente, où il revient entre deux missions, et le réserver aux URGENT. Un agent réservé ne reçoit aucune autre mission ; une URGENT va toujours à l'agent le plus proche, réservé ou non. Avec 6 agents, dont 2 postés au centre des étages et réservés, 94 % des URGENT sont pris en charge en 3 min, contre 68 % sans poste. La saturation ne compte un agent réservé que pour les URGENT en attente.
 - **Annonces vocales** : sonnerie (Web Audio), vibration (Android) et voix française du navigateur. Le navigateur bloque le son avant un premier toucher : le bouton « Activer le son » le débloque à l'ouverture.
 - **Hors ligne côté téléphone** : seule la mission en cours est gardée, et elle est effacée à la déconnexion. Les actions faites sans réseau attendent, puis partent dans l'ordre, avec leur heure réelle, au retour du réseau.
 
@@ -226,4 +271,4 @@ npm run build
 - [x] Sprint 2 (frontend) : application installable (PWA), dashboard du régulateur, demande de transport et suivi du médecin
 - [x] Sprint 3 : attribution automatique, application mobile du brancardier, scans NFC et QR
 - [x] Sprint 4 : parcours à gestes réduits (badges simulés, bracelet seul, arrivée détectée, annonce vocale), pauses, appels au régulateur, carte de connexion, hors ligne, comptes, temps réel (WebSocket, Redis), saturation de la flotte. La dictée vocale (Whisper) passe en perspective
-- [ ] Sprint 5 : tests de charge (Locust), données MIMIC-III, lancement en une commande
+- [x] Sprint 5 : tests de charge (Locust) et analyse de la file d'attente sur les données de l'Hôpital Général Idrissa Pouye (annuaires du MSAS 2020-2021, à la place de MIMIC-III), matrice de sécurité, agents postés et réservés aux URGENT, lancement en une commande (Docker), jeu et scénario de démonstration. Voir `docs/rapport-sprint5-charge-securite.md`

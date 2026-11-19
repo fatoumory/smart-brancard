@@ -153,7 +153,7 @@ L'efficacité des tests a été vérifiée : en ouvrant volontairement une route
 
 ## 7. Perspectives
 
-- Ajouter dans l'application un réglage « agent réservé aux URGENT » et un poste d'attente par agent, pour appliquer la recommandation du § 4.3.
+- ~~Ajouter dans l'application un réglage « agent réservé aux URGENT » et un poste d'attente par agent~~ : **réalisé en fin de Sprint 5**. Le régulateur règle les deux dans l'écran Comptes. Un agent réservé ne reçoit que les URGENT, et l'agent posté voit son poste sur son téléphone. Il reste à mesurer le gain avec de vrais agents : la simulation suppose que l'agent revient à son poste après chaque mission.
 - Refaire l'analyse avec le plan réel de l'HOGIP et des relevés de transports sur quelques semaines (nombre par séjour, origine des URGENT).
 - Recalibrer les hypothèses avec un annuaire hors période COVID dès sa publication.
 
