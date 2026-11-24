@@ -6,6 +6,7 @@
 # k (« combien de minutes vaut une mission déjà faite ») équilibre la charge entre agents proches,
 # sans jamais envoyer un agent beaucoup plus loin. En URGENT, k = 0 : seule la distance compte.
 # Un agent sans position récente (aucune détection depuis 10 min) passe après les agents localisés.
+# Un agent réservé aux URGENT (réglage du régulateur) n'est candidat que pour une mission URGENT.
 # Un agent qui a refusé la mission, ou l'a laissée sans réponse, n'est plus sollicité pour elle
 # pendant 5 min ; ensuite, elle peut lui être reproposée (sinon, avec peu d'agents, elle resterait
 # bloquée indéfiniment). Pendant ce temps, le régulateur voit l'alerte « sans candidat ».
@@ -140,6 +141,10 @@ def assigner_automatiquement(db: Session, mission_id: int) -> Brancardier | None
                .with_for_update(skip_locked=True, of=Brancardier))
     if exclus:
         requete = requete.filter(Brancardier.id.not_in(exclus))
+    if mission.niveau_urgence != NiveauUrgence.URGENT:
+        # Les agents réservés aux URGENT restent libres pour l'urgence vitale suivante.
+        # Une URGENT, elle, va à l'agent le plus proche, réservé ou non (seule la distance compte)
+        requete = requete.filter(Brancardier.reserve_urgent.is_(False))
     candidats = requete.all()
 
     if not candidats:

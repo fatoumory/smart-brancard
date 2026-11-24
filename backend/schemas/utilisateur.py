@@ -56,6 +56,10 @@ class UtilisateurOut(BaseModel):
     position_recente: bool | None = None
     # Fin prévue de la pause en cours (le téléphone affiche le compte à rebours à partir de cette heure)
     fin_pause: datetime | None = None
+    # Poste d'attente entre deux missions, et agent réservé aux URGENT (brancardier uniquement)
+    poste_id: int | None = None
+    poste_nom: str | None = None
+    reserve_urgent: bool | None = None
 
 
 class StatutUpdate(BaseModel):
@@ -76,6 +80,13 @@ class Token(BaseModel):
 class ActivationCompte(BaseModel):
     """Corps de PATCH /utilisateurs/{id} : désactiver (false) ou réactiver (true) un compte"""
     est_actif: bool
+
+
+class AffectationUpdate(BaseModel):
+    """Corps de PATCH /utilisateurs/{id}/affectation : poste d'attente (null = aucun)
+    et réservation aux URGENT d'un brancardier"""
+    poste_id: int | None = None
+    reserve_urgent: bool = False
 
 
 class CarteConnexion(BaseModel):

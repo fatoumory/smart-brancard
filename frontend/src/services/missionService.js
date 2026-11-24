@@ -117,6 +117,14 @@ export function changerActivation(id, estActif) {
   return apiFetch(`/utilisateurs/${id}`, { method: "PATCH", json: { est_actif: estActif } });
 }
 
+/** Poste d'attente d'un brancardier (posteId null = aucun) et réservation aux URGENT.
+ *  Un agent réservé ne reçoit que les missions URGENT (rapport Sprint 5, § 4.3) */
+export function changerAffectation(id, posteId, reserveUrgent) {
+  return apiFetch(`/utilisateurs/${id}/affectation`, {
+    method: "PATCH", json: { poste_id: posteId, reserve_urgent: reserveUrgent },
+  });
+}
+
 /** Nouvelle carte de connexion d'un brancardier : { utilisateur_id, prenom, nom, code }.
  *  Le code n'est donné qu'une fois (à imprimer en QR) ; l'ancienne carte ne fonctionne plus */
 export function genererCarte(id) {

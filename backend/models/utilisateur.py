@@ -1,6 +1,7 @@
 # models/utilisateur.py
 
-from sqlalchemy import Boolean, Column, Date, DateTime, Enum, ForeignKey, Integer, String, case
+from sqlalchemy import Boolean, Column, Date, DateTime, Enum, ForeignKey, Integer, String, case, false
+from sqlalchemy.orm import relationship
 from database import Base
 from models.enums import Role, StatutAgent
 
@@ -68,5 +69,22 @@ class Brancardier(Utilisateur):
     # Propositions laissées sans réponse d'affilée : à 2, l'agent passe INDISPONIBLE.
     # Remis à zéro dès qu'il répond (acceptation ou refus) ou qu'il se remet disponible.
     non_reponses = Column(Integer, nullable=False, default=0, server_default="0")
+
+    # Poste d'attente (rapport Sprint 5, § 4.3) : lieu où l'agent revient attendre entre deux missions,
+    # par exemple le hall central d'un étage. Vide : il attend là où il a déposé son dernier patient.
+    # Choisi par le régulateur ; la position réelle reste celle que donne le badge.
+    poste_id = Column(Integer, ForeignKey("noeuds_hopital.id", ondelete="SET NULL"), nullable=True)
+    # Chargé à la demande : une jointure ici s'ajouterait aux SELECT ... FOR UPDATE sur les
+    # brancardiers, que PostgreSQL refuse avec une jointure externe
+    poste = relationship("NoeudHopital")
+
+    # Agent réservé aux URGENT : il ne reçoit aucune autre mission, pour rester libre quand une
+    # urgence vitale arrive (délai garanti de 3 min). Réglé par le régulateur.
+    reserve_urgent = Column(Boolean, nullable=False, default=False, server_default=false())
+
+    @property
+    def poste_nom(self) -> str | None:
+        """Nom du poste d'attente, affiché sur le téléphone de l'agent et au dashboard"""
+        return self.poste.nom_salle if self.poste is not None else None
 
     __mapper_args__ = {"polymorphic_identity": "brancardier"}

@@ -146,7 +146,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 <header>
   <p class="eyebrow">SMART-BRANCARD · CARDIO-CONNECT · MÉTHODE SCRUM ALTERNÉE · VERSION 3 · MISE À JOUR APRÈS LE SPRINT 4</p>
   <h1>Feuille de route après le Sprint 4</h1>
-  <p class="lede">Les sprints 0 à 4 sont terminés. Le Sprint 4 a changé de cap : au lieu de la dictée vocale du médecin, il a réduit les gestes du brancardier. Des badges, simulés dans le prototype, prouvent sa présence dans les salles ; il ne lui reste qu’un scan à faire, le bracelet du patient, et il se connecte en scannant sa carte. Le système continue de fonctionner sans Internet, les écrans se mettent à jour en temps réel, et le médecin admet un patient depuis son écran. Reste le Sprint 5 : tests de charge, analyse stochastique et livrables.</p>
+  <p class="lede">Les sprints 0 à 5 sont terminés. Le Sprint 4 a changé de cap : au lieu de la dictée vocale du médecin, il a réduit les gestes du brancardier. Des badges, simulés dans le prototype, prouvent sa présence dans les salles ; il ne lui reste qu’un scan à faire, le bracelet du patient, et il se connecte en scannant sa carte. Le système continue de fonctionner sans Internet, les écrans se mettent à jour en temps réel, et le médecin admet un patient depuis son écran. Le Sprint 5 est terminé : tests de charge, analyse stochastique, agents postés réservés aux URGENT, lancement en une commande et démonstration.</p>
   <div class="legend">
     <span><span class="tag done">Fait</span> constaté dans le dépôt</span>
     <span><span class="tag part">En partie</span> commencé, à terminer</span>
@@ -157,8 +157,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 </header>
 
 <div class="summary">
-  <div class="stat"><b>5 / 6</b><span>sprints terminés (0 à 4) : attribution automatique, parcours à gestes réduits, badges simulés, hors ligne, temps réel.</span></div>
-  <div class="stat"><b>200</b><span>tests automatiques du backend, tous les modules couverts (145 à la fin du Sprint 3).</span></div>
+  <div class="stat"><b>6 / 6</b><span>sprints terminés (0 à 5) : attribution automatique, parcours à gestes réduits, badges simulés, hors ligne, temps réel, charge et lancement en une commande.</span></div>
+  <div class="stat"><b>215</b><span>tests automatiques du backend, tous les modules couverts (145 à la fin du Sprint 3).</span></div>
   <div class="stat"><b>3 → 1</b><span>scan demandé au brancardier par mission : le bracelet seulement, au lieu de deux tags de salle et du bracelet.</span></div>
   <div class="stat"><b>4</b><span>chantiers passés en perspective : la dictée vocale, les vrais badges BLE (ESP32), les annonces en wolof et l’équipement des agents en téléphones.</span></div>
 </div>
@@ -433,19 +433,20 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   <article class="sprint">
     <div class="sprint-head">
       <div class="t"><span class="eyebrow">SPRINT 5 · SEMAINES 11-12</span><h2>Simulation de charge, validation et livrables</h2><p class="goal">Prouver que le système tient la charge et que le jury peut tout lancer en une commande.</p></div>
-      <span class="status next">Prochain sprint</span>
+      <span class="status done">Terminé</span>
     </div>
     <div class="cols single">
       <div class="col">
         <div class="who"><h3>En commun</h3></div>
         <ul class="tasks">
-          <li><span class="tag plan">Prévu</span><span class="txt"><span><code>locustfile.py</code> : 50 brancardiers virtuels qui acceptent, refusent et terminent des missions</span><span class="sub">Leurs badges passent par la route du simulateur du Sprint 4.</span></span></li>
-          <li><span class="tag plan">Prévu</span><span class="txt"><span>Import des CSV de démonstration MIMIC-III dans PostgreSQL</span><span class="sub">Seuls les rythmes de transferts entre services sont utilisés, pas les patients ni les lieux.</span></span></li>
-          <li><span class="tag plan">Prévu</span><span class="txt"><span>Analyse stochastique de la file d’attente</span><span class="sub">Demandes par heure tirées de MIMIC-III, file à plusieurs serveurs avec priorités : attente par niveau d’urgence comparée aux délais garantis (3, 8, 15 et 30 min), agents nécessaires par créneau. Vérifiée par simulation et comparée aux mesures Locust.</span><span class="src">CDC §5.6</span></span></li>
-          <li><span class="tag plan">Prévu</span><span class="txt"><span>Dockerfiles du backend et du frontend, lancement en une commande</span><span class="src">CDC §6.4</span></span></li>
-          <li><span class="tag plan">Prévu</span><span class="txt"><span>Jeu de données de démonstration : salles avec leurs tags, agents, patients avec leurs bracelets</span></span></li>
-          <li class="is-new"><span class="tag new">Nouveau</span><span class="txt"><span>Scénario de démonstration du nouveau parcours, avec le simulateur de badges</span></span></li>
-          <li><span class="tag plan">Prévu</span><span class="txt"><span>Vérifications de sécurité (403 par rôle) et README final</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span><code>locustfile.py</code> : 50 brancardiers virtuels qui acceptent, refusent et terminent des missions</span><span class="sub">Leurs badges passent par la route du simulateur. 5 680 requêtes, aucune erreur, 95 % des réponses en moins de 120 ms.</span></span></li>
+          <li class="is-new"><span class="tag new">Modifié</span><span class="txt"><span>Données de l’Hôpital Général Idrissa Pouye (annuaires du MSAS 2020-2021) à la place de MIMIC-III</span><span class="sub">12 615 hospitalisations en 2021, soit environ 35 admissions par jour : plus proche du contexte sénégalais que les données américaines de MIMIC-III. À valider avec les encadrants.</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Analyse stochastique de la file d’attente</span><span class="sub">File à plusieurs serveurs avec priorités, vérifiée par simulation et comparée aux mesures Locust : 4 agents en journée, 5 au pic, 3 la nuit.</span><span class="src">CDC §5.6</span></span></li>
+          <li class="is-new"><span class="tag new">Nouveau</span><span class="txt"><span>Agents postés et réservés aux URGENT</span><span class="sub">Recommandation de l’analyse : avec 6 agents, dont 2 postés au centre des étages et réservés aux URGENT, 94 % des URGENT sont pris en charge en 3 min (68 % sans poste). Réglé par le régulateur dans Comptes.</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Dockerfiles du backend et du frontend, lancement en une commande : <code>docker compose up --build</code></span><span class="src">CDC §6.4</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Jeu de données de démonstration : salles avec leurs tags, agents, patients avec leurs bracelets</span><span class="sub"><code>backend/seed_demo.py</code>, bracelets à imprimer dans <code>docs/demo/bracelets.html</code>.</span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Scénario de démonstration du nouveau parcours, avec le simulateur de badges</span><span class="sub"><code>docs/scenario-demonstration.md</code></span></span></li>
+          <li><span class="tag done">Fait</span><span class="txt"><span>Vérifications de sécurité (403 par rôle) et README final</span></span></li>
         </ul>
       </div>
     </div>

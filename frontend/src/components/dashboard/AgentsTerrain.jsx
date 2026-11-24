@@ -27,8 +27,12 @@ function AgentsTerrain({ agents, erreur }) {
                     return (
                         <li key={agent.id} className="flex items-center justify-between px-5 py-4">
                             <div>
-                                <p className="font-medium text-slate-900">{agent.prenom} {agent.nom}</p>
+                                <p className="font-medium text-slate-900 flex flex-wrap items-center gap-2">
+                                    {agent.prenom} {agent.nom}
+                                    <Reservation agent={agent} />
+                                </p>
                                 <Position agent={agent} />
+                                {agent.poste_nom && <p className="text-xs text-slate-400">Poste : {agent.poste_nom}</p>}
                             </div>
                             <div className="text-right">
                                 <p className={`flex items-center justify-end gap-2 font-medium ${statut.texte}`}>
@@ -44,6 +48,16 @@ function AgentsTerrain({ agents, erreur }) {
                 })}
             </ul>
         </section>
+    );
+}
+
+// Agent réservé aux URGENT (réglé dans Comptes) : il ne reçoit pas les autres missions
+export function Reservation({ agent }) {
+    if (!agent.reserve_urgent) return null;
+    return (
+        <span className="px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-bold uppercase tracking-wide">
+            URGENT seulement
+        </span>
     );
 }
 

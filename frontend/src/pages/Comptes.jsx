@@ -4,7 +4,7 @@ import { BadgeCheck, CreditCard, Printer, Search, UserRoundCheck, UserRoundX, Us
 import EnTete from "../components/EnTete";
 import { useDonnees } from "../hooks/useDonnees";
 import { lireJeton } from "../services/authService";
-import { changerActivation, genererCarte, listerUtilisateurs } from "../services/missionService";
+import { changerActivation, changerAffectation, genererCarte, listerNoeuds, listerUtilisateurs } from "../services/missionService";
 
 const ROLES = { BRANCARDIER: "Brancardier", MEDECIN: "Médecin", REGULATEUR: "Régulateur", ADMIN: "Administrateur" };
 const ORDRE_ROLES = ["BRANCARDIER", "MEDECIN", "REGULATEUR", "ADMIN"];
@@ -29,6 +29,10 @@ function correspond(utilisateur, recherche) {
 //     et le journal d'audit gardent la trace de ce qu'il a fait. Il peut être réactivé.
 function Comptes() {
     const utilisateurs = useDonnees(listerUtilisateurs, 60000, ["agents"]);
+    // Lieux possibles pour le poste d'attente (les ascenseurs ne sont pas des lieux d'attente)
+    const noeuds = useDonnees(listerNoeuds);
+    const lieux = (noeuds.donnees ?? []).filter((l) => l.type_noeud !== "ASCENSEUR")
+        .sort((a, b) => a.etage - b.etage || a.nom_salle.localeCompare(b.nom_salle));
     // Carte qui vient d'être générée : { prenom, nom, code } ; affichée une seule fois
     const [carte, setCarte] = useState(null);
     // Compte dont la désactivation attend confirmation
@@ -69,6 +73,11 @@ function Comptes() {
         await agir(() => changerActivation(u.id, !u.est_actif));
     }
 
+    // Poste d'attente et réservation aux URGENT : enregistrés dès qu'on change la valeur
+    function affecter(u, posteId, reserveUrgent) {
+        return agir(() => changerAffectation(u.id, posteId, reserveUrgent));
+    }
+
     return (
         <div className="min-h-screen">
             <EnTete />
@@ -78,6 +87,10 @@ function Comptes() {
                     <p className="text-sm text-slate-500 max-w-2xl">
                         Imprimez la carte de connexion d'un brancardier : il la scanne en début de garde et il est connecté pour 8 h.
                         Un compte n'est jamais supprimé : il est désactivé, et ses missions restent dans le journal.
+                    </p>
+                    <p className="text-sm text-slate-500 max-w-2xl mt-2">
+                        Poste d'attente : l'agent y revient entre deux missions. « URGENT seulement » : il ne reçoit que les urgences vitales.
+                        Recommandé en journée : un agent posté au centre de chaque étage, réservé aux URGENT (94 % des URGENT pris en charge en 3 min avec 6 agents).
                     </p>
                 </div>
 
@@ -106,12 +119,13 @@ function Comptes() {
                         </label>
                     </div>
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left min-w-[720px]">
+                        <table className="w-full text-left min-w-[920px]">
                             <thead className="bg-slate-50 border-b border-slate-200">
                                 <tr className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     <th className="px-4 py-3">Nom</th>
                                     <th className="px-4 py-3">Rôle</th>
                                     <th className="px-4 py-3">Compte</th>
+                                    <th className="px-4 py-3">Poste d'attente</th>
                                     <th className="px-4 py-3">Carte</th>
                                     <th className="px-4 py-3 text-right">Actions</th>
                                 </tr>
@@ -120,7 +134,7 @@ function Comptes() {
                                 {/* Aucun compte ne correspond à la recherche */}
                                 {liste.length === 0 && tous.length > 0 && (
                                     <tr>
-                                        <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
+                                        <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
                                             Aucun compte ne correspond à « {recherche.trim()} ».
                                         </td>
                                     </tr>
@@ -136,6 +150,11 @@ function Comptes() {
                                             {u.est_actif
                                                 ? <span className="font-semibold text-emerald-700">Actif</span>
                                                 : <span className="font-semibold">Désactivé</span>}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm">
+                                            {u.role === "BRANCARDIER" && u.est_actif
+                                                ? <ReglagePoste agent={u} lieux={lieux} envoi={envoi} onChanger={affecter} />
+                                                : "—"}
                                         </td>
                                         <td className="px-4 py-3 text-sm">
                                             {u.role !== "BRANCARDIER" ? "—"
@@ -181,6 +200,31 @@ function Comptes() {
                     </div>
                 </section>
             </main>
+        </div>
+    );
+}
+
+// Poste d'attente d'un brancardier (liste des lieux) et case « URGENT seulement ».
+// Chaque changement est envoyé tout de suite au serveur ; il vaut pour les missions suivantes.
+function ReglagePoste({ agent, lieux, envoi, onChanger }) {
+    const idListe = `poste-${agent.id}`;
+    return (
+        <div className="flex flex-col gap-1.5">
+            <label htmlFor={idListe} className="sr-only">Poste d'attente de {agent.prenom} {agent.nom}</label>
+            <select id={idListe} value={agent.poste_id ?? ""} disabled={envoi}
+                onChange={(e) => onChanger(agent, e.target.value ? Number(e.target.value) : null, agent.reserve_urgent ?? false)}
+                className="w-full max-w-56 px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 disabled:opacity-50">
+                <option value="">Aucun (reste sur place)</option>
+                {lieux.map((l) => (
+                    <option key={l.id} value={l.id}>{l.nom_salle}</option>
+                ))}
+            </select>
+            <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
+                <input type="checkbox" checked={agent.reserve_urgent ?? false} disabled={envoi}
+                    onChange={(e) => onChanger(agent, agent.poste_id ?? null, e.target.checked)}
+                    className="w-4 h-4 accent-red-600" />
+                URGENT seulement
+            </label>
         </div>
     );
 }

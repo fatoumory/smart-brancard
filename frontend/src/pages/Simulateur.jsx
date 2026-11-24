@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useState } from "react";
-import { Flag, MapPin, Radio, RadioTower, UserRound, X } from "lucide-react";
+import { Flag, House, MapPin, Radio, RadioTower, UserRound, X } from "lucide-react";
 import EnTete from "../components/EnTete";
+import { Reservation } from "../components/dashboard/AgentsTerrain";
 import IndicateurTempsReel from "../components/IndicateurTempsReel";
 import { useDonnees } from "../hooks/useDonnees";
 import { detecterBadge, listerBrancardiers, listerMissions, listerNoeuds } from "../services/missionService";
@@ -160,6 +161,12 @@ function Simulateur() {
                                                     <span className={`w-2 h-2 rounded-full ${statut.point}`} /> {statut.libelle}
                                                 </span>
                                             </span>
+                                            {(a.poste_nom || a.reserve_urgent) && (
+                                                <span className="flex flex-wrap items-center gap-2 text-xs mt-1 text-slate-500">
+                                                    <Reservation agent={a} />
+                                                    {a.poste_nom && `Poste : ${a.poste_nom}`}
+                                                </span>
+                                            )}
                                             <span className={`flex items-center gap-1 text-xs mt-1 ${lieu ? "text-slate-600" : "text-slate-400"}`}>
                                                 {lieu ? <Radio className="w-3.5 h-3.5 text-emerald-600" /> : <MapPin className="w-3.5 h-3.5" />}
                                                 {lieu ? `Badge capté : ${nomDe[lieu] ?? `lieu ${lieu}`}` : "Badge hors de portée"}
@@ -171,6 +178,13 @@ function Simulateur() {
                                                 <button type="button" onClick={() => placer(a.id, objectif.noeudId)}
                                                     className="px-2.5 py-1 rounded-lg bg-primaire text-white text-xs font-semibold flex items-center gap-1 cursor-pointer">
                                                     <Flag className="w-3.5 h-3.5" /> {objectif.libelle} : {objectif.nom}
+                                                </button>
+                                            )}
+                                            {/* Agent posté, sans mission : il retourne attendre à son poste */}
+                                            {!objectif && a.poste_id && lieu !== a.poste_id && (
+                                                <button type="button" onClick={() => placer(a.id, a.poste_id)}
+                                                    className="px-2.5 py-1 rounded-lg bg-white border border-primaire text-primaire text-xs font-semibold flex items-center gap-1 cursor-pointer">
+                                                    <House className="w-3.5 h-3.5" /> Retour au poste : {a.poste_nom}
                                                 </button>
                                             )}
                                             {lieu && (
