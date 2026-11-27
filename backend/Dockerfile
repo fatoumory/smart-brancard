@@ -9,7 +9,9 @@ WORKDIR /app
 
 # Dépendances d'abord : cette couche reste en cache tant que requirements.txt ne change pas
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Délai et nouvelles tentatives généreux : avec une connexion lente, pip abandonne sinon au bout
+# de 15 s sans réponse de PyPI (« Read timed out ») et toute la construction échoue
+RUN pip install --no-cache-dir --default-timeout=120 --retries 10 -r requirements.txt
 
 # Code de l'application (sans venv ni .env : voir .dockerignore)
 COPY . .
