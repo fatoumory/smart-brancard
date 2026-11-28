@@ -13,19 +13,19 @@ Critère : 95 % des missions HAUTE, MOYENNE et BASSE prises en charge dans leur 
 | 2 | pic de fin de matinée | 7.8 | 2 | **4** | 41 % | 46 % |
 | 2 | nuit (18 h-8 h) | 1.2 | 1 | **2** | 13 % | 43 % |
 | 3 | journée (8 h-18 h) | 7.8 | 2 | **4** | 41 % | 50 % |
-| 3 | pic de fin de matinée | 11.7 | 3 | **5** | 49 % | 50 % |
-| 3 | nuit (18 h-8 h) | 1.9 | 1 | **3** | 12 % | 53 % |
+| 3 | pic de fin de matinée | 11.7 | 3 | **5** | 48 % | 51 % |
+| 3 | nuit (18 h-8 h) | 1.9 | 1 | **3** | 12 % | 52 % |
 | 4 | journée (8 h-18 h) | 10.4 | 3 | **5** | 44 % | 51 % |
-| 4 | pic de fin de matinée | 15.6 | 4 | **6** | 54 % | 51 % |
+| 4 | pic de fin de matinée | 15.6 | 4 | **6** | 53 % | 51 % |
 | 4 | nuit (18 h-8 h) | 2.5 | 1 | **3** | 17 % | 51 % |
 
 ## Détail : 3 transports par séjour, journée
 
 | Agents | Occupation (formule / simulation) | URGENT : attente moy. (min) / dans 3 min | HAUTE : attente moy. (min) / dans 8 min | MOYENNE : attente moy. (min) / dans 15 min | BASSE : attente moy. (min) / dans 30 min |
 |---|---|---|---|---|---|
-| 2 | 80 % / 87 % | 7.7 / 12 % | 8.3 / 56 % | 12.7 / 71 % | 71.8 / 42 % |
-| 3 | 54 % / 56 % | 4.4 / 33 % | 4.4 / 87 % | 5.0 / 96 % | 7.0 / 96 % |
-| 4 | 40 % / 41 % | 2.9 / 50 % | 3.0 / 96 % | 3.2 / 99 % | 3.3 / 100 % |
+| 2 | 80 % / 87 % | 7.5 / 12 % | 26.6 / 31 % | 31.1 / 41 % | 40.8 / 46 % |
+| 3 | 54 % / 56 % | 4.2 / 35 % | 4.7 / 84 % | 5.3 / 95 % | 6.6 / 98 % |
+| 4 | 40 % / 41 % | 2.9 / 50 % | 3.1 / 95 % | 3.2 / 99 % | 3.3 / 100 % |
 | 5 | 32 % / 31 % | 2.3 / 57 % | 2.3 / 99 % | 2.4 / 100 % | 2.4 / 100 % |
 | 6 | 27 % / 26 % | 1.9 / 67 % | 2.0 / 100 % | 2.0 / 100 % | 2.0 / 100 % |
 | 7 | 23 % / 22 % | 1.6 / 71 % | 1.7 / 100 % | 1.7 / 100 % | 1.7 / 100 % |
@@ -42,21 +42,21 @@ La colonne « départ surtout des Urgences » est une variante (60 % Urgences, 2
 
 | Agents | Organisation | URGENT en 3 min (départ au hasard) | URGENT en 3 min (départ surtout des Urgences) | HAUTE / MOYENNE / BASSE dans le délai |
 |---|---|---|---|---|
-| 4 | Application actuelle (aucun poste) | 48 % | 47 % | 96 % / 99 % / 100 % |
-| 4 | 1 agent posté aux Urgences | 50 % | 56 % | 95 % / 99 % / 100 % |
-| 4 | 1 agent posté aux Urgences, réservé aux URGENT | 51 % | 61 % | 88 % / 97 % / 98 % |
-| 4 | 2 agents postés (hall RDC, palier de l'étage) | 63 % | 60 % | 96 % / 99 % / 100 % |
-| 4 | 2 agents postés, réservés aux URGENT | 87 % | 86 % | 63 % / 78 % / 61 % |
-| 5 | Application actuelle (aucun poste) | 61 % | 60 % | 99 % / 100 % / 100 % |
-| 5 | 1 agent posté aux Urgences | 61 % | 65 % | 99 % / 100 % / 100 % |
+| 4 | Application actuelle (aucun poste) | 48 % | 48 % | 95 % / 99 % / 100 % |
+| 4 | 1 agent posté aux Urgences | 50 % | 55 % | 95 % / 100 % / 100 % |
+| 4 | 1 agent posté aux Urgences, réservé aux URGENT | 49 % | 61 % | 87 % / 96 % / 98 % |
+| 4 | 2 agents postés (hall RDC, palier de l'étage) | 62 % | 60 % | 96 % / 99 % / 100 % |
+| 4 | 2 agents postés, réservés aux URGENT | 86 % | 87 % | 44 % / 58 % / 62 % |
+| 5 | Application actuelle (aucun poste) | 62 % | 60 % | 99 % / 100 % / 100 % |
+| 5 | 1 agent posté aux Urgences | 62 % | 66 % | 99 % / 100 % / 100 % |
 | 5 | 1 agent posté aux Urgences, réservé aux URGENT | 60 % | 74 % | 96 % / 99 % / 100 % |
 | 5 | 2 agents postés (hall RDC, palier de l'étage) | 72 % | 72 % | 99 % / 100 % / 100 % |
-| 5 | 2 agents postés, réservés aux URGENT | 91 % | 91 % | 86 % / 96 % / 97 % |
+| 5 | 2 agents postés, réservés aux URGENT | 90 % | 92 % | 85 % / 95 % / 98 % |
 | 6 | Application actuelle (aucun poste) | 68 % | 66 % | 100 % / 100 % / 100 % |
 | 6 | 1 agent posté aux Urgences | 68 % | 71 % | 100 % / 100 % / 100 % |
 | 6 | 1 agent posté aux Urgences, réservé aux URGENT | 69 % | 76 % | 99 % / 100 % / 100 % |
 | 6 | 2 agents postés (hall RDC, palier de l'étage) | 82 % | 80 % | 100 % / 100 % / 100 % |
-| 6 | 2 agents postés, réservés aux URGENT | **94 %** | 95 % | 97 % / 100 % / 100 % |
+| 6 | 2 agents postés, réservés aux URGENT | **94 %** | 95 % | 96 % / 100 % / 100 % |
 | 8 | Application actuelle (aucun poste) | 77 % | 81 % | 100 % / 100 % / 100 % |
 | 8 | 1 agent posté aux Urgences | 76 % | 84 % | 100 % / 100 % / 100 % |
 | 8 | 1 agent posté aux Urgences, réservé aux URGENT | 80 % | 87 % | 100 % / 100 % / 100 % |
