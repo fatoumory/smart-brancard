@@ -8,11 +8,14 @@
 #
 # 1. Modèle analytique : file M/M/c à priorités non préemptives (formule de Cobham). Les demandes
 #    arrivent selon un processus de Poisson, c agents servent la file dans l'ordre des urgences.
+#    Elle suppose un ordre strict par urgence (l'application applique un vieillissement) : elle sert
+#    surtout à vérifier l'occupation des agents, qui ne dépend pas de l'ordre de service.
 #    Il donne la charge des agents et l'attente moyenne, mais pas les trajets réels.
 #
 # 2. Simulation à événements discrets, fidèle aux règles de l'application :
 #    - plan de l'hôpital (backend/data/graphe_hopital.json) et plus courts chemins (Dijkstra) ;
-#    - file servie par urgence puis ancienneté ; agent choisi par le score du backend
+#    - ordre de la file du backend (vieillissement) : URGENT d'abord, puis la mission la plus proche
+#      de dépasser son délai garanti ; agent choisi par le score du backend
 #      (trajet + 0,5 min par mission déjà faite, trajet seul en URGENT) ;
 #    - réponse en 5 à 20 s, 10 % de refus (l'agent est retenu 15 min) ;
 #    - la prise en charge est le scan du bracelet, à l'arrivée de l'agent près du patient ;
@@ -157,7 +160,13 @@ def simuler(debit_h: float, c: int, heures: float, graine: int, prechauffe_h: fl
 
     def repartir(t):
         """Comme traiter_file_attente : chaque mission, dans l'ordre, à l'agent libre de plus petit score"""
-        for cle in sorted(file):
+        # Ordre du backend (cle_de_file, avec vieillissement) : URGENT d'abord, puis la mission la plus
+        # proche de dépasser son délai garanti, puis la plus ancienne
+        def ordre(cle):
+            urgence, cree, _, _ = missions[cle[2]]
+            return (urgence != "URGENT", cree + H.DELAIS_GARANTIS_MIN[urgence], cle[2])
+
+        for cle in sorted(file, key=ordre):
             if not any(ag.libre for ag in agents):
                 return
             urgence, _, source, _ = missions[cle[2]]

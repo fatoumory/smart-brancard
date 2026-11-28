@@ -52,12 +52,12 @@ Trois approches complémentaires, avec les mêmes hypothèses :
   - « charge » : 50 agents, demande au pic.
 
 **3.2 Modèle analytique.**
-- La file des demandes est modélisée comme une file M/M/c à priorités non préemptives : arrivées poissonniennes, *c* agents, service par ordre d'urgence.
+- La file des demandes est modélisée comme une file M/M/c à priorités non préemptives : arrivées poissonniennes, *c* agents, service par ordre d'urgence. Cette formule suppose un ordre strict par urgence, alors que l'application applique un vieillissement : elle sert surtout à vérifier l'occupation des agents, qui ne dépend pas de l'ordre de service.
 - L'attente moyenne de chaque niveau d'urgence est donnée par la formule de Cobham (Cobham, A., « Priority assignment in waiting line problems », *Operations Research*, 2(1), 1954), à partir de la probabilité d'attente d'Erlang C.
 
 **3.3 Simulation à événements discrets.** Le modèle analytique ignore la géographie de l'hôpital. Une simulation reprend donc exactement les règles de l'application :
 - plan de l'hôpital et plus courts chemins (Dijkstra) ;
-- ordre de la file : urgence, puis ancienneté ;
+- ordre de la file, avec vieillissement : URGENT d'abord, puis la mission la plus proche de dépasser son délai garanti (une BASSE qui attend depuis longtemps finit par passer devant une MOYENNE qui vient d'arriver) ;
 - choix de l'agent par le score du backend : temps de trajet + 0,5 min par mission déjà effectuée, temps de trajet seul pour une URGENT ;
 - refus et retenue de 15 min.
 
@@ -103,11 +103,11 @@ Le délai URGENT (3 min) est plus court que de nombreux trajets du plan : 1 à 5
 
 | Organisation (journée) | Agents | URGENT en 3 min | HAUTE / MOYENNE / BASSE dans le délai |
 |---|---|---|---|
-| Application actuelle | 4 | 48 % | 96 / 99 / 100 % |
+| Application actuelle | 4 | 48 % | 95 / 99 / 100 % |
 | Application actuelle | 8 | 77 % | 100 % |
 | 1 agent posté aux Urgences | 6 | 68 % | 100 % |
 | 2 agents postés (un par étage), non réservés | 6 | 82 % | 100 % |
-| **2 agents postés (un par étage), réservés aux URGENT** | **6** | **94 %** | **97 / 100 / 100 %** |
+| **2 agents postés (un par étage), réservés aux URGENT** | **6** | **94 %** | **96 / 100 / 100 %** |
 
 **Recommandation :** en journée, 4 agents polyvalents et 2 agents postés au centre de chaque étage, réservés aux URGENT. Depuis ce point central, chaque agent posté atteint tous les services de son étage en 1,75 min au plus.
 
@@ -146,6 +146,7 @@ L'efficacité des tests a été vérifiée : en ouvrant volontairement une route
 - **Années de référence.** Les annuaires 2020 et 2021 couvrent la période de la COVID-19, où l'activité hospitalière a pu être inhabituelle.
 - **Complétude des données.** L'annuaire signale lui-même que les données des établissements publics de santé remontées dans DHIS2 sont parfois incomplètes. Le chiffre de l'Hôpital Principal de Dakar (2 449 hospitalisations pour 94 909 journées) étant incohérent, il n'a pas été retenu.
 - **Transports par séjour.** Aucune donnée publiée n'existe sur ce point : il a été traité par une analyse de sensibilité (2 à 4).
+- **Répartition dans le temps et par urgence.** La part de la journée (75 %), le pic de fin de matinée (×1,5) et la part de chaque niveau d'urgence sont des hypothèses fondées sur l'organisation d'un hôpital, et non des mesures : l'annuaire ne les donne pas. La part de 75 % charge la journée, ce qui conduit plutôt à surestimer le nombre d'agents nécessaires en journée.
 - **Plan de l'hôpital.** Les distances viennent du plan simplifié du prototype (deux niveaux, temps de couloir estimés), et non du plan réel de l'HOGIP. Les conclusions sur les URGENT dépendent directement de ces distances.
 - **Origine des URGENT.** La variante « URGENT surtout depuis les Urgences » est une hypothèse sans donnée.
 - **Accélération du temps.** Elle introduit un léger surcoût dans les attentes mesurées par Locust (environ 0,5 min). Par ailleurs, les délais fixes du serveur ne sont pas accélérés : délais de réponse, exclusion de 5 min après un refus.

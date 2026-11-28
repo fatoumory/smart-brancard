@@ -86,7 +86,7 @@ Deux approches, avec les mêmes hypothèses que Locust :
 1. **Modèle analytique** : file M/M/c à priorités non préemptives (formule de Cobham). Il donne la charge
    des agents et l'attente moyenne dans la file.
 2. **Simulation à événements discrets** : elle reprend les règles de l'application (plan de l'hôpital et
-   Dijkstra, ordre de la file, score de choix de l'agent, refus et retenue de 15 min). La prise en charge
+   Dijkstra, ordre de la file avec vieillissement, score de choix de l'agent, refus et retenue de 15 min). La prise en charge
    est le scan du bracelet, comme dans le backend.
 
 Les deux donnent la même occupation des agents, ce qui valide la simulation. Les résultats sont dans
